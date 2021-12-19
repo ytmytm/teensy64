@@ -163,9 +163,21 @@ uint8_t   internal_RAM[65536];
 #include "rom_basic.h"
 #include "rom_kernal.h"
 
-#define EXROM  1
-#define GAME   1
-#define CHAREN_BIT		0x04
+// include 8k diagnostics cartridge from http://www.zimmers.net/anonftp/pub/cbm/schematics/cartridges/c64/diag/index.html
+//#define DIAG_CART
+
+#ifdef DIAG_CART
+#define EXROM 0
+#define GAME 1
+#include "diag-c64-8k.h" // CART_LOW_ROM at $8000
+#else
+#define EXROM 1
+#define GAME 1
+uint8_t   CART_LOW_ROM[0x2000];
+#endif // DIAG_CART
+uint8_t   CART_HIGH_ROM[0x2000]; // CART_HIGH_ROM empty
+
+#define CHAREN_BIT	0x04
 #define HIRAM_BIT	0x02
 #define LORAM_BIT	0x01
 
@@ -380,12 +392,27 @@ inline void start_read(uint32_t local_address) {
 // Fetch data from the correct Bank
 // -------------------------------------------------
 inline uint8_t fetch_byte_from_bank() {
-                     
-    if ((Page_160_191) && (bank_mode & (HIRAM_BIT|LORAM_BIT)==(HIRAM_BIT|LORAM_BIT))) {
-      return BASIC_ROM[current_address & 0x1FFF];
+
+    if ((Page_128_159) && ((EXROM==1 && GAME==0) || (EXROM==0 && ((bank_mode & (HIRAM_BIT|LORAM_BIT))==(HIRAM_BIT|LORAM_BIT))))) {
+      return CART_LOW_ROM[current_address & 0x1FFF];
     }
-    if ((Page_224_255) && (bank_mode & HIRAM_BIT)) {
-      return KERNAL_ROM[current_address & 0x1FFF];
+
+    if (Page_160_191) {
+      if ( EXROM==0 && (bank_mode & HIRAM_BIT)) {
+        return CART_HIGH_ROM[current_address & 0x1FFF];
+      }
+      if ( GAME==1 && ((bank_mode & (HIRAM_BIT|LORAM_BIT))==(HIRAM_BIT|LORAM_BIT))) {
+        return BASIC_ROM[current_address & 0x1FFF];
+      }
+    }
+
+    if (Page_224_255) {
+      if (EXROM==1 && GAME==0) {
+        return CART_HIGH_ROM[current_address & 0x1FFF];
+      }
+      if (bank_mode & HIRAM_BIT) {
+        return KERNAL_ROM[current_address & 0x1FFF];
+      }
     }
     return internal_RAM[current_address];
 }
