@@ -225,7 +225,7 @@ void setup() {
   digitalWriteFast(PIN_P1, 0x1 ); 
   digitalWriteFast(PIN_P2, 0x1 ); 
 
-  Serial.begin(9600);
+  Serial.begin(115200);
 
 }
 
