@@ -381,15 +381,15 @@ inline void start_read(uint32_t local_address) {
 // -------------------------------------------------
 inline uint8_t fetch_byte_from_bank() {
                      
-    if (Page_160_191==0x1)  {  if   ((bank_mode&0x3)==0x3)                                  {  return BASIC_ROM[current_address & 0x1FFF];        }
-                               else                                                         {  return internal_RAM[current_address];              }  }
-    
-    if (Page_224_255==0x1)  {  if ( (bank_mode&0x2)==0x2)                                   {  return KERNAL_ROM[current_address & 0x1FFF];       }
-                               else                                                         {  return internal_RAM[current_address];              }  }
-    
-     return internal_RAM[current_address];
+    if ((Page_160_191) && (bank_mode & (HIRAM_BIT|LORAM_BIT)==(HIRAM_BIT|LORAM_BIT))) {
+      return BASIC_ROM[current_address & 0x1FFF];
+    }
+    if ((Page_224_255) && (bank_mode & HIRAM_BIT)) {
+      return KERNAL_ROM[current_address & 0x1FFF];
+    }
+    return internal_RAM[current_address];
 }
-  
+
 
 // -------------------------------------------------
 // On the rising CLK edge, read in the data
