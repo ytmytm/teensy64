@@ -33,6 +33,7 @@
 // Revision 3 12/10/2021
 // Made optimiations for acceleration and UART control
 //
+//
 //------------------------------------------------------------------------
 //
 // Copyright (c) 2021 Ted Fried
@@ -132,11 +133,6 @@
 #define register_sp_fixed  (0x0100 | register_sp)
 
 
-// This eliminates most of the superflous fetches and writes of the cycle-accurate 6502
-//
-#define SPEEDUP 0
-
-
 // CPU register for direct reads of the GPIOs
 //
 uint8_t   current_p=0x7; 
@@ -168,6 +164,8 @@ uint8_t   internal_RAM[65536];
 #include "rom_kernal.h"
 
 int       incomingByte;   
+
+
 
     
 // ------------------------------------------------------------------------------
@@ -248,7 +246,7 @@ void setup() {
 //          0x2 - Reads accelerated using internal memory and writes are cycle accurate and pass through to motherboard
 //          0x3 - All read and write accesses use accelerated internal memory 
 // ----------------------------------------------------------
-inline uint8_t internal_address_check(uint16_t local_address) {
+FASTRUN inline uint8_t internal_address_check(uint16_t local_address) {
 
   if ( (local_address > 0x0001 ) && (local_address <= 0x03FF) ) return mode;            //   Zero-Page up to video
   if ( (local_address >= 0x0400) && (local_address <= 0x07FF) && mode>1) return 0x1;    //   C64 Video Memory // can't be 3 on boot
@@ -256,13 +254,15 @@ inline uint8_t internal_address_check(uint16_t local_address) {
   if ( (local_address >= 0x8000) && (local_address <= 0x9FFF) ) return mode;            //   C64 CART_LOW & RAM
   if ( (local_address >= 0xA000) && (local_address <= 0xBFFF) ) return mode;            //   C64 BASIC ROM & RAM
   if ( (local_address >= 0xC000) && (local_address <= 0xCFFF) ) return mode;            //   C64 RAM
-//if ( (local_address >= 0xD000) && (local_address <= 0xDFFF) ) return 0x0;             //   C64 I/O // if I/O is enabled this must be r/w cycle-exact
+  if ( (local_address >= 0xD800) && (local_address <= 0xDBFF) && mode>1) return mode;   //   C64 Color RAM
+  if ( (local_address >= 0xD000) && (local_address <= 0xDFFF) ) return 0x0;             //   C64 I/O // if I/O is enabled this must be r/w cycle-exact
   if ( (local_address >= 0xE000) && (local_address <= 0xE4FF) ) return mode;            //   C64 KERNAL ROM
   if ( (local_address >= 0xE500) && (local_address <= 0xFF7F) && mode>1) return 0x1;    //   C64 KERNAL ROM  // can't be 2 nor 3 on boot, why?
   if ( (local_address >= 0xFF80) && (local_address <= 0xFFFF) ) return mode;            //   C64 KERNAL ROM
 
-  return 0x0;
-} 
+  return mode;
+
+}
 
 
 // -------------------------------------------------
@@ -526,7 +526,7 @@ uint16_t Sign_Extend16(uint16_t reg_data)  {
 }
 
 
-void Begin_Fetch_Next_Opcode()  {
+inline void Begin_Fetch_Next_Opcode()  {
     register_pc++;
     assert_sync=1;
     start_read(register_pc);
@@ -537,37 +537,37 @@ void Begin_Fetch_Next_Opcode()  {
 // -------------------------------------------------
 // Addressing Modes
 // -------------------------------------------------
-uint8_t Fetch_Immediate()  {
+inline uint8_t Fetch_Immediate()  {
     register_pc++;
     ea_data = read_byte(register_pc);
     return ea_data;
 }
 
-uint8_t Fetch_ZeroPage()  { 
+inline uint8_t Fetch_ZeroPage()  { 
     effective_address = Fetch_Immediate(); 
     ea_data = read_byte(effective_address);
     return ea_data;
 }
 
-uint8_t Fetch_ZeroPage_X()  {   
+inline uint8_t Fetch_ZeroPage_X()  {   
     uint16_t bal;
     bal = Fetch_Immediate();
-    if (SPEEDUP==0) read_byte(register_pc+1); 
+    if (mode==0) read_byte(register_pc+1); 
     effective_address = (0x00FF & (bal + register_x));
     ea_data = read_byte(effective_address);
     return ea_data;
 }
 
-uint8_t Fetch_ZeroPage_Y()  {   
+inline uint8_t Fetch_ZeroPage_Y()  {   
     uint16_t bal;
     bal = Fetch_Immediate();
-    if (SPEEDUP==0) read_byte(register_pc+1); 
+    if (mode==0) read_byte(register_pc+1); 
     effective_address = (0x00FF & (bal + register_y)); 
     ea_data = read_byte(effective_address);
     return ea_data;
 }
 
-uint16_t Calculate_Absolute()  { 
+inline uint16_t Calculate_Absolute()  { 
     uint16_t adl, adh;
 
     adl = Fetch_Immediate();
@@ -576,7 +576,7 @@ uint16_t Calculate_Absolute()  {
     return effective_address;
 }
 
-uint8_t Fetch_Absolute()  { 
+inline uint8_t Fetch_Absolute()  { 
     uint16_t adl, adh;
 
     adl = Fetch_Immediate();
@@ -586,7 +586,7 @@ uint8_t Fetch_Absolute()  {
     return ea_data;
 }
 
-uint8_t Fetch_Absolute_X(uint8_t page_cross_check)  {
+inline uint8_t Fetch_Absolute_X(uint8_t page_cross_check)  {
     uint16_t bal, bah;
     
     bal = Fetch_Immediate();
@@ -594,13 +594,13 @@ uint8_t Fetch_Absolute_X(uint8_t page_cross_check)  {
     effective_address = bah + bal + register_x;
     ea_data = read_byte(effective_address );
     
-    if (  (SPEEDUP==0) && page_cross_check==1 && (  (0xFF00&effective_address) != (0xFF00&bah) ) ) {  
+    if (  (mode==0) && page_cross_check==1 && (  (0xFF00&effective_address) != (0xFF00&bah) ) ) {  
         ea_data = read_byte(effective_address ); 
     }
     return ea_data;
 }
 
-uint8_t Fetch_Absolute_Y(uint8_t page_cross_check)  {
+inline uint8_t Fetch_Absolute_Y(uint8_t page_cross_check)  {
     uint16_t bal, bah;
     
     bal = Fetch_Immediate();
@@ -608,18 +608,18 @@ uint8_t Fetch_Absolute_Y(uint8_t page_cross_check)  {
     effective_address = bah + bal + register_y;
     ea_data = read_byte(effective_address );
     
-    if ( (SPEEDUP==0)  && page_cross_check==1 && (  (0xFF00&effective_address) != (0xFF00&bah) ) ) {  
+    if ( (mode==0)  && page_cross_check==1 && (  (0xFF00&effective_address) != (0xFF00&bah) ) ) {  
         ea_data = read_byte(effective_address ); 
     } 
     return ea_data;
 }
 
-uint8_t Fetch_Indexed_Indirect_X()  { 
+inline uint8_t Fetch_Indexed_Indirect_X()  { 
     uint16_t bal;
     uint16_t adl, adh;
     
     bal = Fetch_Immediate() + register_x;
-    read_byte(bal);
+    if (mode==0) read_byte(bal);
     adl = read_byte(0xFF&bal);
     adh = read_byte(0xFF&(bal+1)) << 8;
     effective_address = adh + adl ;
@@ -627,7 +627,7 @@ uint8_t Fetch_Indexed_Indirect_X()  {
     return ea_data;
 }
 
-uint8_t Fetch_Indexed_Indirect_Y(uint8_t page_cross_check)  {
+inline uint8_t Fetch_Indexed_Indirect_Y(uint8_t page_cross_check)  {
     uint16_t ial, bah, bal;
     
     ial = Fetch_Immediate();
@@ -637,74 +637,68 @@ uint8_t Fetch_Indexed_Indirect_Y(uint8_t page_cross_check)  {
     effective_address = bah + bal + register_y;
     ea_data = read_byte(effective_address);
     
-    if ( (SPEEDUP==0) && page_cross_check==1 && ((0xFF00&effective_address) != (0xFF00&bah)) ) {  
+    if ( (mode==0) && page_cross_check==1 && ((0xFF00&effective_address) != (0xFF00&bah)) ) {  
         ea_data = read_byte(effective_address); 
     }
     return ea_data;
 }
 
 
-void Write_ZeroPage(uint8_t local_data)  {
+inline void Write_ZeroPage(uint8_t local_data)  {
     effective_address = Fetch_Immediate();
     write_byte(effective_address , local_data);
     return;
 }
 
-void Write_Absolute(uint8_t local_data)  {
+inline void Write_Absolute(uint8_t local_data)  {
     effective_address = Fetch_Immediate();
     effective_address = (Fetch_Immediate() << 8) + effective_address;
     write_byte(effective_address , local_data );
     return;
 }
 
-void Write_ZeroPage_X(uint8_t local_data)  {
+inline void Write_ZeroPage_X(uint8_t local_data)  {
     effective_address = Fetch_Immediate();
-    if (SPEEDUP==0) read_byte(effective_address);
+    if (mode==0) read_byte(effective_address);
     write_byte( (0x00FF&(effective_address + register_x)) , local_data );
     return;
 }
 
-void Write_ZeroPage_Y(uint8_t local_data)  {
+inline void Write_ZeroPage_Y(uint8_t local_data)  {
     effective_address = Fetch_Immediate();
-    if (SPEEDUP==0) read_byte(effective_address);
+    if (mode==0) read_byte(effective_address);
     write_byte( (0x00FF&(effective_address + register_y)) , local_data );
     return;
 }
 
-void Write_Absolute_X(uint8_t local_data)  {
+inline void Write_Absolute_X(uint8_t local_data)  {
     uint16_t bal,bah;
 
     bal = Fetch_Immediate();
     bah = Fetch_Immediate()<<8;
     effective_address = bal + bah + register_x; 
-    if (SPEEDUP==0) read_byte(effective_address);
+    if (mode==0) read_byte(effective_address);
     write_byte(effective_address , local_data );  
     return;
 }
 
-void Write_Absolute_Y(uint8_t local_data)  {
+inline void Write_Absolute_Y(uint8_t local_data)  {
     uint16_t bal,bah;
 
     bal = Fetch_Immediate();
     bah = Fetch_Immediate()<<8;
     effective_address = bal + bah + register_y;
-    read_byte(effective_address);
-
-    if (SPEEDUP==0) {
-        if ( (0xFF00&effective_address) != (0xFF00&bah) ) { 
-        read_byte(effective_address);
-        }
-    }
+    if (mode==0) read_byte(effective_address);
     write_byte(effective_address , local_data );  
     return;
 }
 
-void Write_Indexed_Indirect_X(uint8_t local_data)  {
+inline void Write_Indexed_Indirect_X(uint8_t local_data)  {
     uint16_t bal;
     uint16_t adl, adh;
 
     bal = Fetch_Immediate();
-    read_byte(bal);
+    if (mode==0) read_byte(bal);
     adl = read_byte(0xFF&(bal+register_x));
     adh = read_byte(0xFF&(bal+register_x+1)) << 8;
     effective_address = adh + adl;
@@ -712,7 +706,7 @@ void Write_Indexed_Indirect_X(uint8_t local_data)  {
     return;
 }
 
-void Write_Indexed_Indirect_Y(uint8_t local_data)  {  
+inline void Write_Indexed_Indirect_Y(uint8_t local_data)  {  
     uint16_t ial;
     uint16_t bal, bah;
 
@@ -720,13 +714,13 @@ void Write_Indexed_Indirect_Y(uint8_t local_data)  {
     bal = read_byte(ial);
     bah = read_byte(ial+1)<<8;
     effective_address = bah + bal + register_y;
-    if (SPEEDUP==0) read_byte(effective_address);
+    if (mode==0) read_byte(effective_address);
     write_byte(effective_address , local_data );
     return;
 }
 
-void Double_WriteBack(uint8_t local_data)  {  
-    if (SPEEDUP==0)  write_byte(effective_address , ea_data);
+inline void Double_WriteBack(uint8_t local_data)  {  
+    if (mode==0)  write_byte(effective_address , ea_data);
     write_byte(effective_address , local_data);
     return;
 }
@@ -780,7 +774,7 @@ void nmi_handler() {
     register_flags = register_flags | 0x20;                         // Set the flag[5]          
     register_flags = register_flags & 0xEF;                         // Clear the B flag     
     
-    read_byte(register_pc+1);                                       // Fetch PC+1 (Discard)
+    if (mode==0) read_byte(register_pc+1);                          // Fetch PC+1 (Discard)
     push(register_pc>>8);                                           // Push PCH
     push(register_pc);                                              // Push PCL
     push(register_flags);                                           // Push P
@@ -809,7 +803,7 @@ void irq_handler(uint8_t opcode_is_brk) {
     if (opcode_is_brk==1) register_flags = register_flags | 0x10;   // Set the B flag
     else                  register_flags = register_flags & 0xEF;   // Clear the B flag
     
-    read_byte(register_pc+1);                                       // Fetch PC+1 (Discard)
+    if (mode==0) read_byte(register_pc+1);                          // Fetch PC+1 (Discard)
     push(register_pc>>8);                                           // Push PCH
     push(register_pc);                                              // Push PCL
     push(register_flags);                                           // Push P
@@ -837,7 +831,7 @@ void irq_handler(uint8_t opcode_is_brk) {
 // -------------------------------------------------
 void opcode_0x0A() {
     
-    read_byte(register_pc);        
+    if (mode==0) read_byte(register_pc);        
     Begin_Fetch_Next_Opcode();
      
     if (0x80&register_a)   register_flags = register_flags | 0x01;              // Set the C flag
@@ -856,7 +850,7 @@ void opcode_0x0A() {
 // -------------------------------------------------
 void opcode_0x4A() {
     
-    read_byte(register_pc);        
+    if (mode==0) read_byte(register_pc);        
     Begin_Fetch_Next_Opcode();
     
     if (0x01&register_a)   register_flags = register_flags | 0x01;              // Set the C flag
@@ -875,7 +869,7 @@ void opcode_0x6A() {
 
   uint8_t old_carry_flag=0;
     
-    read_byte(register_pc);        
+    if (mode==0) read_byte(register_pc);        
     Begin_Fetch_Next_Opcode();
     
     old_carry_flag = register_flags << 7;                                       // Shift the old carry flag to bit[8] to be rotated in
@@ -897,7 +891,7 @@ void opcode_0x2A() {
 
   uint8_t old_carry_flag=0;
 
-    read_byte(register_pc);        
+    if (mode==0) read_byte(register_pc);        
     Begin_Fetch_Next_Opcode();
     
     old_carry_flag = 0x1 & register_flags;                                      // Store the old carry flag to be rotated in
@@ -1051,43 +1045,43 @@ void opcode_0xF1() { Calculate_SBC(Fetch_Indexed_Indirect_Y(1));   return;  }  /
 // -------------------------------------------------
 // Flag set/resets and NOP
 // -------------------------------------------------
-void opcode_0xEA() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();                                        return;  }  // 0xEA - NOP   
-void opcode_0x18() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags&0xFE;   return;  }  // 0x18 - CLC - Clear Carry Flag  
-void opcode_0xD8() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags&0xF7;   return;  }  // 0xD8 - CLD - Clear Decimal Mode  
-void opcode_0x58() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags&0xFB;   return;  }  // 0x58 - CLI - Clear Interrupt Flag  
-void opcode_0xB8() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags&0xBF;   return;  }  // 0xB8 - CLV - Clear Overflow Flag  
-void opcode_0x38() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags|0x01;   return;  }  // 0x38 - SEC - Set Carry Flag  
-void opcode_0x78() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags|0x04;   return;  }  // 0x78 - SEI - Set Interrupt Flag  
-void opcode_0xF8() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags|0x08;   return;  }  // 0xF8 - SED - Set Decimal Mode  
+void opcode_0xEA() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();                                        return;  }  // 0xEA - NOP   
+void opcode_0x18() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags&0xFE;   return;  }  // 0x18 - CLC - Clear Carry Flag  
+void opcode_0xD8() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags&0xF7;   return;  }  // 0xD8 - CLD - Clear Decimal Mode  
+void opcode_0x58() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags&0xFB;   return;  }  // 0x58 - CLI - Clear Interrupt Flag  
+void opcode_0xB8() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags&0xBF;   return;  }  // 0xB8 - CLV - Clear Overflow Flag  
+void opcode_0x38() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags|0x01;   return;  }  // 0x38 - SEC - Set Carry Flag  
+void opcode_0x78() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags|0x04;   return;  }  // 0x78 - SEI - Set Interrupt Flag  
+void opcode_0xF8() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_flags=register_flags|0x08;   return;  }  // 0xF8 - SED - Set Decimal Mode  
 
 
 // -------------------------------------------------
 // Increment/Decrements
 // -------------------------------------------------
-void opcode_0xCA() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_x=register_x-1;   Calc_Flags_NEGATIVE_ZERO(register_x); return;  }  // 0xCA - DEX - Decrement X  
-void opcode_0x88() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_y=register_y-1;   Calc_Flags_NEGATIVE_ZERO(register_y); return;  }  // 0x88 - DEY - Decrement Y  
-void opcode_0xE8() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_x=register_x+1;   Calc_Flags_NEGATIVE_ZERO(register_x); return;  }  // 0xE8 - INX - Increment X  
-void opcode_0xC8() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_y=register_y+1;   Calc_Flags_NEGATIVE_ZERO(register_y); return;  }  // 0xC8 - INY - Increment Y  
+void opcode_0xCA() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_x=register_x-1;   Calc_Flags_NEGATIVE_ZERO(register_x); return;  }  // 0xCA - DEX - Decrement X  
+void opcode_0x88() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_y=register_y-1;   Calc_Flags_NEGATIVE_ZERO(register_y); return;  }  // 0x88 - DEY - Decrement Y  
+void opcode_0xE8() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_x=register_x+1;   Calc_Flags_NEGATIVE_ZERO(register_x); return;  }  // 0xE8 - INX - Increment X  
+void opcode_0xC8() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_y=register_y+1;   Calc_Flags_NEGATIVE_ZERO(register_y); return;  }  // 0xC8 - INY - Increment Y  
 
 
 // -------------------------------------------------
 // Transfers
 // -------------------------------------------------
-void opcode_0xAA() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_x=register_a;   Calc_Flags_NEGATIVE_ZERO(register_x); return;  }  // 0xAA - TAX - Transfer Accumulator to X 
-void opcode_0xA8() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_y=register_a;   Calc_Flags_NEGATIVE_ZERO(register_y); return;  }  // 0xA8 - TAY - Transfer Accumulator to Y
-void opcode_0xBA() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_x=register_sp;  Calc_Flags_NEGATIVE_ZERO(register_x); return;  }  // 0xBA - TSX - Transfer Stack Pointer to X
-void opcode_0x8A() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_a=register_x;   Calc_Flags_NEGATIVE_ZERO(register_a); return;  }  // 0x8A - TXA - Transfer X to Accumulator
-void opcode_0x9A() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_sp=register_x;                                        return;  }  // 0x9A - TXS - Transfer X to Stack Pointer
-void opcode_0x98() {  read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_a=register_y;   Calc_Flags_NEGATIVE_ZERO(register_a); return;  }  // 0x98 - TYA - Transfer Y to Accumulator
+void opcode_0xAA() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_x=register_a;   Calc_Flags_NEGATIVE_ZERO(register_x); return;  }  // 0xAA - TAX - Transfer Accumulator to X 
+void opcode_0xA8() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_y=register_a;   Calc_Flags_NEGATIVE_ZERO(register_y); return;  }  // 0xA8 - TAY - Transfer Accumulator to Y
+void opcode_0xBA() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_x=register_sp;  Calc_Flags_NEGATIVE_ZERO(register_x); return;  }  // 0xBA - TSX - Transfer Stack Pointer to X
+void opcode_0x8A() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_a=register_x;   Calc_Flags_NEGATIVE_ZERO(register_a); return;  }  // 0x8A - TXA - Transfer X to Accumulator
+void opcode_0x9A() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_sp=register_x;                                        return;  }  // 0x9A - TXS - Transfer X to Stack Pointer
+void opcode_0x98() {  if (mode==0) read_byte(register_pc+1);  Begin_Fetch_Next_Opcode();  register_a=register_y;   Calc_Flags_NEGATIVE_ZERO(register_a); return;  }  // 0x98 - TYA - Transfer Y to Accumulator
 
 
 // -------------------------------------------------
 // PUSH/POP Flags and Accumulator 
 // -------------------------------------------------
-void opcode_0x08() {  read_byte(register_pc+1);  push(register_flags|0x30);                                                              Begin_Fetch_Next_Opcode();  return;  }  // 0x08 - PHP - Push Flags to Stack
-void opcode_0x48() {  read_byte(register_pc+1);  push(register_a);                                                                       Begin_Fetch_Next_Opcode();  return;  }  // 0x48 - PHA - Push Accumulator to the stack
-void opcode_0x28() {  read_byte(register_pc+1);  read_byte(register_sp_fixed);  register_flags=(pop()|0x30);                             Begin_Fetch_Next_Opcode();  return;  }  // 0x28 - PLP - Pop Flags from Stack
-void opcode_0x68() {  read_byte(register_pc+1);  read_byte(register_sp_fixed);  register_a=pop();  Calc_Flags_NEGATIVE_ZERO(register_a); Begin_Fetch_Next_Opcode();  return;  }  // 0x68 - PLA - Pop Accumulator from Stack
+void opcode_0x08() {  if (mode==0) read_byte(register_pc+1);  push(register_flags|0x30);                                                                  Begin_Fetch_Next_Opcode();  return;  }  // 0x08 - PHP - Push Flags to Stack
+void opcode_0x48() {  if (mode==0) read_byte(register_pc+1);  push(register_a);                                                                           Begin_Fetch_Next_Opcode();  return;  }  // 0x48 - PHA - Push Accumulator to the stack
+void opcode_0x28() {  if (mode==0) { read_byte(register_pc+1);  read_byte(register_sp_fixed); }; register_flags=(pop()|0x30);                             Begin_Fetch_Next_Opcode();  return;  }  // 0x28 - PLP - Pop Flags from Stack
+void opcode_0x68() {  if (mode==0) { read_byte(register_pc+1);  read_byte(register_sp_fixed); }; register_a=pop();  Calc_Flags_NEGATIVE_ZERO(register_a); Begin_Fetch_Next_Opcode();  return;  }  // 0x68 - PLA - Pop Accumulator from Stack
 
 
 // -------------------------------------------------
@@ -1405,7 +1399,7 @@ void Branch_Taken()  {
     effective_address = Sign_Extend16(Fetch_Immediate()); 
     effective_address = (register_pc+1) + effective_address;
 
-    if (SPEEDUP==0) {
+    if (mode==0) {
     if ( (0xFF00&register_pc) == (0xFF00&effective_address) )  {  Fetch_Immediate();                     }  // Page boundary not crossed
     else                                                       {  Fetch_Immediate(); Fetch_Immediate();  }  // Page boundary crossed
     }
@@ -1414,14 +1408,14 @@ void Branch_Taken()  {
     start_read(register_pc);
     return;
 }
-void opcode_0xB0() {  if ((flag_c)==1) Branch_Taken();  else { Fetch_Immediate(); Begin_Fetch_Next_Opcode();}  return;  }  // 0xB0 - BCS - Branch on Carry Set
-void opcode_0x90() {  if ((flag_c)==0) Branch_Taken();  else { Fetch_Immediate(); Begin_Fetch_Next_Opcode();}  return;  }  // 0x90 - BCC - Branch on Carry Clear
-void opcode_0xF0() {  if ((flag_z)==1) Branch_Taken();  else { Fetch_Immediate(); Begin_Fetch_Next_Opcode();}  return;  }  // 0xF0 - BEQ - Branch on Zero Set
-void opcode_0xD0() {  if ((flag_z)==0) Branch_Taken();  else { Fetch_Immediate(); Begin_Fetch_Next_Opcode();}  return;  }  // 0xD0 - BNE - Branch on Zero Clear
-void opcode_0x70() {  if ((flag_v)==1) Branch_Taken();  else { Fetch_Immediate(); Begin_Fetch_Next_Opcode();}  return;  }  // 0x70 - BVS - Branch on Overflow Set
-void opcode_0x50() {  if ((flag_v)==0) Branch_Taken();  else { Fetch_Immediate(); Begin_Fetch_Next_Opcode();}  return;  }  // 0x50 - BVC - Branch on Overflow Clear
-void opcode_0x30() {  if ((flag_n)==1) Branch_Taken();  else { Fetch_Immediate(); Begin_Fetch_Next_Opcode();}  return;  }  // 0x30 - BMI - Branch on Minus (N Flag Set)
-void opcode_0x10() {  if ((flag_n)==0) Branch_Taken();  else { Fetch_Immediate(); Begin_Fetch_Next_Opcode();}  return;  }  // 0x10 - BPL - Branch on Plus  (N Flag Clear)
+void opcode_0xB0() {  if ((flag_c)==1) Branch_Taken();  else { if (mode==0) { Fetch_Immediate(); } else { register_pc++; }; Begin_Fetch_Next_Opcode();}  return;  }  // 0xB0 - BCS - Branch on Carry Set
+void opcode_0x90() {  if ((flag_c)==0) Branch_Taken();  else { if (mode==0) { Fetch_Immediate(); } else { register_pc++; }; Begin_Fetch_Next_Opcode();}  return;  }  // 0x90 - BCC - Branch on Carry Clear
+void opcode_0xF0() {  if ((flag_z)==1) Branch_Taken();  else { if (mode==0) { Fetch_Immediate(); } else { register_pc++; }; Begin_Fetch_Next_Opcode();}  return;  }  // 0xF0 - BEQ - Branch on Zero Set
+void opcode_0xD0() {  if ((flag_z)==0) Branch_Taken();  else { if (mode==0) { Fetch_Immediate(); } else { register_pc++; }; Begin_Fetch_Next_Opcode();}  return;  }  // 0xD0 - BNE - Branch on Zero Clear
+void opcode_0x70() {  if ((flag_v)==1) Branch_Taken();  else { if (mode==0) { Fetch_Immediate(); } else { register_pc++; }; Begin_Fetch_Next_Opcode();}  return;  }  // 0x70 - BVS - Branch on Overflow Set
+void opcode_0x50() {  if ((flag_v)==0) Branch_Taken();  else { if (mode==0) { Fetch_Immediate(); } else { register_pc++; }; Begin_Fetch_Next_Opcode();}  return;  }  // 0x50 - BVC - Branch on Overflow Clear
+void opcode_0x30() {  if ((flag_n)==1) Branch_Taken();  else { if (mode==0) { Fetch_Immediate(); } else { register_pc++; }; Begin_Fetch_Next_Opcode();}  return;  }  // 0x30 - BMI - Branch on Minus (N Flag Set)
+void opcode_0x10() {  if ((flag_n)==0) Branch_Taken();  else { if (mode==0) { Fetch_Immediate(); } else { register_pc++; }; Begin_Fetch_Next_Opcode();}  return;  }  // 0x10 - BPL - Branch on Plus  (N Flag Clear)
 
 
 // -------------------------------------------------
@@ -1456,7 +1450,7 @@ void opcode_0x20()  {
     
     adl = Fetch_Immediate();
     adh = Fetch_Immediate()<<8;
-    read_byte(register_sp_fixed);
+    if (mode==0) read_byte(register_sp_fixed);
     push((0xFF00&register_pc)>>8);  
 
     push(0x00FF&register_pc);
@@ -1473,7 +1467,7 @@ void opcode_0x40()  {
     uint16_t pcl, pch; 
     
     Fetch_Immediate();
-    read_byte(register_sp_fixed);
+    if (mode==0) read_byte(register_sp_fixed);
     register_flags = pop();
     pcl = pop();
     pch = pop()<<8;
@@ -1490,11 +1484,11 @@ void opcode_0x60()  {
     uint16_t pcl, pch; 
     
     Fetch_Immediate();
-    read_byte(register_sp_fixed);
+    if (mode==0) read_byte(register_sp_fixed);
     pcl = pop();
     pch = pop()<<8;
     register_pc = pch+pcl+1;  
-    if (SPEEDUP==0) read_byte(register_pc);
+    if (mode==0) read_byte(register_pc);
     assert_sync=1;
     start_read(register_pc);
     return ;
