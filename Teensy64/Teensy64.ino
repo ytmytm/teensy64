@@ -1,3 +1,5 @@
+// IDE settings: Teensy 4.1, Serial, 600MHz, Faster
+
 //
 //
 //  File Name   :  MCL64.c
@@ -248,18 +250,17 @@ void setup() {
 // ----------------------------------------------------------
 inline uint8_t internal_address_check(uint16_t local_address) {
 
-
-  if ( (local_address > 0x0001 ) && (local_address <= 0x03FF) ) return mode;            //   Zero-Page up to video 
-  if ( (local_address >= 0x0400) && (local_address <= 0x07FF) && mode>1) return 0x1;    //   C64 Video Memory 
-  if ( (local_address >= 0x0800) && (local_address <= 0x7FFF) ) return mode;            //   C64 RAM 
-  if ( (local_address >= 0x8000) && (local_address <= 0x9FFF) ) return mode;            //   C64 CART_LOW & RAM 
+  if ( (local_address > 0x0001 ) && (local_address <= 0x03FF) ) return mode;            //   Zero-Page up to video
+  if ( (local_address >= 0x0400) && (local_address <= 0x07FF) && mode>1) return 0x1;    //   C64 Video Memory // can't be 3 on boot
+  if ( (local_address >= 0x0800) && (local_address <= 0x7FFF) ) return mode;            //   C64 RAM
+  if ( (local_address >= 0x8000) && (local_address <= 0x9FFF) ) return mode;            //   C64 CART_LOW & RAM
   if ( (local_address >= 0xA000) && (local_address <= 0xBFFF) ) return mode;            //   C64 BASIC ROM & RAM
   if ( (local_address >= 0xC000) && (local_address <= 0xCFFF) ) return mode;            //   C64 RAM
-//if ( (local_address >= 0xD000) && (local_address <= 0xDFFF) ) return 0x0;             //   C64 I/O
-  if ( (local_address >= 0xE000) && (local_address <= 0xE4FF) ) return mode;            //   C64 KERNAL ROM  
-  if ( (local_address >= 0xE500) && (local_address <= 0xFF7F) && mode>1) return 0x1;    //   C64 KERNAL ROM  
-  if ( (local_address >= 0xFF80) && (local_address <= 0xFFFF) ) return mode;            //   C64 KERNAL ROM 
- 
+//if ( (local_address >= 0xD000) && (local_address <= 0xDFFF) ) return 0x0;             //   C64 I/O // if I/O is enabled this must be r/w cycle-exact
+  if ( (local_address >= 0xE000) && (local_address <= 0xE4FF) ) return mode;            //   C64 KERNAL ROM
+  if ( (local_address >= 0xE500) && (local_address <= 0xFF7F) && mode>1) return 0x1;    //   C64 KERNAL ROM  // can't be 2 nor 3 on boot, why?
+  if ( (local_address >= 0xFF80) && (local_address <= 0xFFFF) ) return mode;            //   C64 KERNAL ROM
+
   return 0x0;
 } 
 
