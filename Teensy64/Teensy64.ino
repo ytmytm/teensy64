@@ -163,6 +163,12 @@ uint8_t   internal_RAM[65536];
 #include "rom_basic.h"
 #include "rom_kernal.h"
 
+#define EXROM  1
+#define GAME   1
+#define VIC_IO			0x04
+#define KERNAL_ROM_ENABLED	0x02
+#define BASIC_ROM_ENABLED	0x01
+
 int       incomingByte;   
 
 
@@ -480,7 +486,13 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
        wait_for_CLK_rising_edge();
        digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );   
   }            
-   return;
+  if ((current_p & VIC_IO) &&					        // IO enabled and
+       ((current_p & (KERNAL_ROM_ENABLED | BASIC_ROM_ENABLED)) != 0) && // BASIC and KERNAL not both unmapped
+       (internal_address_check(local_address) == 0xd030) )              // and addr = d030
+  {
+    mode = ( local_write_data & 0x03 );
+  }
+  return;
 }
 
   
