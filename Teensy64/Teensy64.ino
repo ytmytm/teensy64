@@ -445,8 +445,8 @@ inline uint8_t read_byte(uint16_t local_address) {
 inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
 
   // Teensy64 Control Registers, don't pass them to outside bus
-  // if I/O is enabled and address is one of the special adresses handle the control value
-  if ((current_p & IO_ENABLED) && (local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
+  // if I/O is enabled and BASIC and KERNAL are not both unmapped and the address is one of the special adresses handle the control value
+  if ((current_p & IO_ENABLED) && ((current_p & (KERNAL_ROM_ENABLED | BASIC_ROM_ENABLED)) != 0) && (local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
        switch(local_address) {
 	 case TEENSY64_REGISTER_BASE+0: mode = (local_write_data & 0x03); Serial.print("M"); Serial.println(mode); break; // trim to lowest two bits
          default: break;
