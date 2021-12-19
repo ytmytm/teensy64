@@ -165,9 +165,12 @@ uint8_t   internal_RAM[65536];
 
 #define EXROM  1
 #define GAME   1
-#define VIC_IO			0x04
+#define IO_ENABLED		0x04
 #define KERNAL_ROM_ENABLED	0x02
 #define BASIC_ROM_ENABLED	0x01
+
+#define TEENSY64_REGISTER_BASE	0xd030
+#define TEENSY64_REGISTER_SIZE	0x01
 
 int       incomingByte;   
 
@@ -440,10 +443,20 @@ inline uint8_t read_byte(uint16_t local_address) {
 // Full write cycle with address and data written
 // -------------------------------------------------
 inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
-  
+
+  // Teensy64 Control Registers, don't pass them to outside bus
+  // if I/O is enabled and address is one of the special adresses handle the control value
+  if ((current_p & IO_ENABLED) && (local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
+       switch(local_address) {
+	 case TEENSY64_REGISTER_BASE+0: mode = (local_write_data & 0x03); Serial.print("M"); Serial.println(mode); break; // trim to lowest two bits
+         default: break;
+       }
+       return;
+  }
+
   // Internal RAM
   //
-    if (internal_address_check(local_address)>0x2)  {
+  if (internal_address_check(local_address)>0x2)  {
     last_access_internal_RAM=1;
     internal_RAM[local_address] = local_write_data;
       //if ( (Page_128_159==0x1)  && ( (EXROM==1 && GAME==0) || ( EXROM==0 && ((bank_mode&0x3)==0x3) ) )) {  } else internal_RAM[local_address] = local_write_data; 
@@ -485,12 +498,6 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
        
        wait_for_CLK_rising_edge();
        digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );   
-  }            
-  if ((current_p & VIC_IO) &&					        // IO enabled and
-       ((current_p & (KERNAL_ROM_ENABLED | BASIC_ROM_ENABLED)) != 0) && // BASIC and KERNAL not both unmapped
-       (internal_address_check(local_address) == 0xd030) )              // and addr = d030
-  {
-    mode = ( local_write_data & 0x03 );
   }
   return;
 }
