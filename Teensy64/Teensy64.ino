@@ -165,9 +165,9 @@ uint8_t   internal_RAM[65536];
 
 #define EXROM  1
 #define GAME   1
-#define IO_ENABLED		0x04
-#define KERNAL_ROM_ENABLED	0x02
-#define BASIC_ROM_ENABLED	0x01
+#define CHAREN_BIT		0x04
+#define HIRAM_BIT	0x02
+#define LORAM_BIT	0x01
 
 #define TEENSY64_REGISTER_BASE	0xd030
 #define TEENSY64_REGISTER_SIZE	0x01
@@ -446,7 +446,7 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
 
   // Teensy64 Control Registers, don't pass them to outside bus
   // if I/O is enabled and BASIC and KERNAL are not both unmapped and the address is one of the special adresses handle the control value
-  if ((current_p & IO_ENABLED) && ((current_p & (KERNAL_ROM_ENABLED | BASIC_ROM_ENABLED)) != 0) && (local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
+  if ((current_p & CHAREN_BIT) && ((current_p & (HIRAM_BIT | LORAM_BIT)) != 0) && (local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
        switch(local_address) {
 	 case TEENSY64_REGISTER_BASE+0: mode = (local_write_data & 0x03); Serial.print("M"); Serial.println(mode); break; // trim to lowest two bits
          default: break;
