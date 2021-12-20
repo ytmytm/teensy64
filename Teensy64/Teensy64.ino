@@ -125,9 +125,6 @@
 #define Page_160_191  ( (current_address >= 0xA000) && (current_address <= 0xBFFF) ) ? 0x1 : 0x0 
 #define Page_224_255  ( (current_address >= 0xE000) && (current_address <= 0xFFFF) ) ? 0x1 : 0x0 
 
-#define bank_mode  ( 0x18 | (current_p&0x7)  )
-
-
 // 6502 stack always in Page 1
 //
 #define register_sp_fixed  (0x0100 | register_sp)
@@ -135,7 +132,6 @@
 
 // CPU register for direct reads of the GPIOs
 //
-uint8_t   current_p=0x7; 
 uint8_t   register_flags=0x34; 
 uint8_t   next_instruction;
 uint8_t   internal_memory_range=0;
@@ -153,7 +149,12 @@ uint8_t   assert_sync=0;
 uint8_t   global_temp=0;
 uint8_t   last_access_internal_RAM=0;
 uint8_t   ea_data=0;
-uint8_t   mode=0;
+uint8_t   mode=1;
+uint8_t   current_p=0x7;
+uint8_t   bank_mode=0x1f;
+uint8_t   io_enabled=1;
+uint8_t   EXROM=1;
+uint8_t   GAME=1;
 
 uint16_t  register_pc=0;
 uint16_t  current_address=0;
@@ -164,17 +165,8 @@ uint8_t   internal_RAM[65536];
 #include "rom_kernal.h"
 
 // include 8k diagnostics cartridge from http://www.zimmers.net/anonftp/pub/cbm/schematics/cartridges/c64/diag/index.html
-//#define DIAG_CART
-
-#ifdef DIAG_CART
-#define EXROM 0
-#define GAME 1
+// send 'e' to set EXROM to 0, send 'E' to disable cart (EXROM=1)
 #include "diag-c64-8k.h" // CART_LOW_ROM at $8000
-#else
-#define EXROM 1
-#define GAME 1
-uint8_t   CART_LOW_ROM[0x2000];
-#endif // DIAG_CART
 uint8_t   CART_HIGH_ROM[0x2000]; // CART_HIGH_ROM empty
 
 #define CHAREN_BIT	0x04
@@ -242,6 +234,11 @@ void setup() {
   pinMode(PIN_DATAOUT7,    OUTPUT);
   pinMode(PIN_DATAOUT_OE_n,  OUTPUT); 
 
+  // this should be within write_port1() function
+  current_p = 7;
+  bank_mode = (EXROM<<4) | (GAME<<3) | (current_p&0x7);
+  io_enabled = ((current_p & CHAREN_BIT) && ((current_p & (HIRAM_BIT | LORAM_BIT)) != 0));
+
   digitalWriteFast(PIN_P0, 0x1 ); 
   digitalWriteFast(PIN_P1, 0x1 ); 
   digitalWriteFast(PIN_P2, 0x1 ); 
@@ -262,24 +259,23 @@ void setup() {
 
 // ----------------------------------------------------------
 // Address range check
-//  Return: 0x0 - All exernal memory accesses
+//  Return: 0x0 - All external memory accesses
 //          0x1 - Reads and writes are cycle accurate using internal memory with writes passing through to motherboard
-//          0x2 - Reads accelerated using internal memory and writes are cycle accurate and pass through to motherboard
-//          0x3 - All read and write accesses use accelerated internal memory 
+//          0x2 - Enable speedups, Reads accelerated using internal memory and writes are cycle accurate and pass through to motherboard
+//          0x3 - Enable speedups, All read and write accesses use accelerated internal memory
 // ----------------------------------------------------------
 FASTRUN inline uint8_t internal_address_check(uint16_t local_address) {
 
-  if ( (local_address > 0x0001 ) && (local_address <= 0x03FF) ) return mode;            //   Zero-Page up to video
+//  if ( (local_address > 0x0001 ) && (local_address <= 0x03FF) ) return mode;            //   Zero-Page up to video
   if ( (local_address >= 0x0400) && (local_address <= 0x07FF) && mode>1) return 0x1;    //   C64 Video Memory // can't be 3 on boot
-  if ( (local_address >= 0x0800) && (local_address <= 0x7FFF) ) return mode;            //   C64 RAM
-  if ( (local_address >= 0x8000) && (local_address <= 0x9FFF) ) return mode;            //   C64 CART_LOW & RAM
-  if ( (local_address >= 0xA000) && (local_address <= 0xBFFF) ) return mode;            //   C64 BASIC ROM & RAM
-  if ( (local_address >= 0xC000) && (local_address <= 0xCFFF) ) return mode;            //   C64 RAM
-  if ( (local_address >= 0xD800) && (local_address <= 0xDBFF) && mode>1) return mode;   //   C64 Color RAM
-  if ( (local_address >= 0xD000) && (local_address <= 0xDFFF) ) return 0x0;             //   C64 I/O // if I/O is enabled this must be r/w cycle-exact
-  if ( (local_address >= 0xE000) && (local_address <= 0xE4FF) ) return mode;            //   C64 KERNAL ROM
+//  if ( (local_address >= 0x0800) && (local_address <= 0x7FFF) ) return mode;            //   C64 RAM
+//  if ( (local_address >= 0x8000) && (local_address <= 0x9FFF) ) return mode;            //   C64 CART_LOW & RAM
+//  if ( (local_address >= 0xA000) && (local_address <= 0xBFFF) ) return mode;            //   C64 BASIC ROM & RAM
+//  if ( (local_address >= 0xC000) && (local_address <= 0xCFFF) ) return mode;            //   C64 RAM
+  if ( (local_address >= 0xD000) && (local_address <= 0xDFFF) ) return io_enabled ? 0x0 : mode ; //   C64 I/O // if I/O is enabled this must be r/w cycle-exact
+//  if ( (local_address >= 0xE000) && (local_address <= 0xE4FF) ) return mode;            //   C64 KERNAL ROM
   if ( (local_address >= 0xE500) && (local_address <= 0xFF7F) && mode>1) return 0x1;    //   C64 KERNAL ROM  // can't be 2 nor 3 on boot, why?
-  if ( (local_address >= 0xFF80) && (local_address <= 0xFFFF) ) return mode;            //   C64 KERNAL ROM
+//  if ( (local_address >= 0xFF80) && (local_address <= 0xFFFF) ) return mode;            //   C64 KERNAL ROM
 
   return mode;
 
@@ -473,13 +469,18 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
 
   // Teensy64 Control Registers, don't pass them to outside bus
   // if I/O is enabled and BASIC and KERNAL are not both unmapped and the address is one of the special adresses handle the control value
-  if ((current_p & CHAREN_BIT) && ((current_p & (HIRAM_BIT | LORAM_BIT)) != 0) && (local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
+  if (io_enabled) {
+    if ((local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
        switch(local_address) {
-	 case TEENSY64_REGISTER_BASE+0: mode = (local_write_data & 0x03); Serial.print("M"); Serial.println(mode); break; // trim to lowest two bits
-         default: break;
+         case TEENSY64_REGISTER_BASE+0: mode = (local_write_data & 0x03); Serial.print("M"); Serial.println(mode); break; // trim to lowest two bits
+         default: Serial.print("E: unknown access to $"); Serial.println(local_address, HEX); break;
        }
        return;
+    }
   }
+
+  // it should be like this (or within 'else' above), but then boot in mode 1 doesn't work, why? (because reading from external i/o doesn't work at all?)
+  // if (!io_enabled) { internal_RAM[local_address] = local_write_data; |;
 
   // Internal RAM
   //
@@ -511,10 +512,12 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
        digitalWriteFast(PIN_DATAOUT7,  (local_write_data & 0x80)>>7 ); 
      
        if (local_address==0x1) {  
-       current_p = local_write_data;
        digitalWriteFast(PIN_P0,  (local_write_data & 0x01) ); 
        digitalWriteFast(PIN_P1,  (local_write_data & 0x02) >> 1 ); 
        digitalWriteFast(PIN_P2,  (local_write_data & 0x04) >> 2 ); 
+       current_p = local_write_data;
+       bank_mode = (EXROM<<4) | (GAME<<3) | (current_p&0x7);
+       io_enabled = ((current_p & CHAREN_BIT) && ((current_p & (HIRAM_BIT | LORAM_BIT)) != 0));
      }
      
        
@@ -1976,6 +1979,22 @@ void opcode_0xAB() {
 // --------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------
 
+void test_sequence() {
+  uint8_t tmp_mode;
+  tmp_mode = mode;
+  mode = 1;
+  for (uint8_t i=0;i<255;i++) {
+    write_byte(0x400+i,i);
+  }
+  write_byte(0xc000, 0x78);
+  write_byte(0xc001, 0xee);
+  write_byte(0xc002, 0x20);
+  write_byte(0xc003, 0xd0);
+  write_byte(0xc004, 0x4c);
+  write_byte(0xc005, 0x01);
+  write_byte(0xc006, 0xc0);
+  mode = tmp_mode;
+}
 
 // -------------------------------------------------
 //
@@ -1983,9 +2002,9 @@ void opcode_0xAB() {
 //
 // -------------------------------------------------
  void loop() {
-  
+
   uint16_t local_counter=0;
-  
+
   // Give Teensy 4.1 a moment
   delay (50);
   wait_for_CLK_rising_edge();
@@ -2005,17 +2024,24 @@ void opcode_0xAB() {
       // for acceleration modes 0,1,2,3
       //
       local_counter++;
-      if (local_counter==8000){
-        if (Serial.available() ) { 
+      if (local_counter==8000) {
+         if (Serial.available() ) {
           incomingByte = Serial.read();   
           switch (incomingByte){
-            case 48: mode=0;  Serial.println("M0"); break;
-            case 49: mode=1;  Serial.println("M1"); break;
-            case 50: mode=2;  Serial.println("M2"); break;
-            case 51: mode=3;  Serial.println("M3"); break;
+            case '0': mode=0;  Serial.println("M0"); break;
+            case '1': mode=1;  Serial.println("M1"); break;
+            case '2': mode=2;  Serial.println("M2"); break;
+            case '3': mode=3;  Serial.println("M3"); break;
+            case 'r': reset_sequence(); Serial.println("RESET"); break;
+            case 'e': EXROM=0; reset_sequence(); Serial.println("EXROM=0"); break;
+            case 'E': EXROM=1; reset_sequence(); Serial.println("EXROM=1"); break;
+            case 'g': GAME=0; reset_sequence(); Serial.println("GAME=0"); break;
+            case 'G': GAME=1; reset_sequence(); Serial.println("GAME=1"); break;
+            case 't': Serial.println("TEST"); test_sequence(); break;
+            case '?': Serial.print("M"); Serial.print(mode); Serial.print(" EXROM"); Serial.print(EXROM); Serial.print(" GAME"); Serial.println(GAME); break;
           }
         }
-      }    
+      }
     
       // Poll for NMI and IRQ
       //
