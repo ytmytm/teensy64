@@ -1994,6 +1994,7 @@ void test_sequence() {
   write_byte(0xc005, 0x01);
   write_byte(0xc006, 0xc0);
   mode = tmp_mode;
+  start_read(register_pc);
 }
 
 // -------------------------------------------------
