@@ -133,9 +133,6 @@
 // CPU register for direct reads of the GPIOs
 //
 uint8_t   register_flags=0x34; 
-uint8_t   next_instruction;
-uint8_t   internal_memory_range=0;
-uint8_t   nmi_n_old=1;
 uint8_t   register_a=0;
 uint8_t   register_x=0;
 uint8_t   register_y=0;
@@ -145,7 +142,6 @@ uint8_t   direct_reset=0;
 uint8_t   direct_ready_n=0;
 uint8_t   direct_irq=0;
 uint8_t   direct_nmi=0;
-uint8_t   assert_sync=0;
 uint8_t   global_temp=0;
 uint8_t   last_access_internal_RAM=0;
 uint8_t   ea_data=0;
@@ -577,7 +573,6 @@ uint16_t Sign_Extend16(uint16_t reg_data)  {
 
 inline void Begin_Fetch_Next_Opcode()  {
     register_pc++;
-    assert_sync=1;
     start_read(register_pc);
     return;
 }
@@ -804,7 +799,6 @@ void reset_sequence() {
     register_flags = 0x34;                                          // Set the I and B flags
             
     register_pc = (temp2<<8) | temp1;    
-    assert_sync=1;  
     start_read(register_pc);                                        // Fetch first opcode at vector PCH,PCL
     
     
@@ -833,7 +827,6 @@ void nmi_handler() {
     register_flags = register_flags | 0x34;                         // Set the I flag and restore the B flag
 
     register_pc = (temp2<<8) | temp1;           
-    assert_sync=1;
     start_read(register_pc);                                        // Fetch first opcode at vector PCH,PCL
     
     return;
@@ -862,7 +855,6 @@ void irq_handler(uint8_t opcode_is_brk) {
     register_flags = register_flags | 0x34;                         // Set the I flag and restore the B flag
                 
     register_pc = (temp2<<8) | temp1;           
-    assert_sync=1;
     start_read(register_pc);                                        // Fetch first opcode at vector PCH,PCL
     
     return;
@@ -1453,7 +1445,6 @@ void Branch_Taken()  {
     else                                                       {  Fetch_Immediate(); Fetch_Immediate();  }  // Page boundary crossed
     }
     register_pc = effective_address;
-    assert_sync=1;
     start_read(register_pc);
     return;
 }
@@ -1470,7 +1461,7 @@ void opcode_0x10() {  if ((flag_n)==0) Branch_Taken();  else { if (mode<2) { Fet
 // -------------------------------------------------
 // Jumps and Returns
 // -------------------------------------------------
-void opcode_0x4C() { register_pc=Calculate_Absolute();  assert_sync=1; start_read(register_pc);  return;  }  // 0x4C - JMP - Jump Absolute
+void opcode_0x4C() { register_pc=Calculate_Absolute();  start_read(register_pc);  return;  }  // 0x4C - JMP - Jump Absolute
 
 
 // -------------------------------------------------
@@ -1486,7 +1477,6 @@ void opcode_0x6C()  {
     adh = read_byte(lah + lal + 1)<<8;
     effective_address = adh+adl;  
     register_pc = (0xFF00&adh) + (0x00FF&effective_address) ;  // 6502 page wrapping bug 
-    assert_sync=1;
     start_read(register_pc);
     return ;
 }
@@ -1504,7 +1494,6 @@ void opcode_0x20()  {
 
     push(0x00FF&register_pc);
     register_pc = adh+adl;  
-    assert_sync=1;
     start_read(register_pc);
     return ;
 }
@@ -1521,7 +1510,6 @@ void opcode_0x40()  {
     pcl = pop();
     pch = pop()<<8;
     register_pc = pch+pcl;  
-    assert_sync=1;
     start_read(register_pc);
     return ;
 }
@@ -1538,7 +1526,6 @@ void opcode_0x60()  {
     pch = pop()<<8;
     register_pc = pch+pcl+1;  
     if (mode<2) read_byte(register_pc);
-    assert_sync=1;
     start_read(register_pc);
     return ;
 }
@@ -2004,6 +1991,8 @@ void test_sequence() {
  void loop() {
 
   uint16_t local_counter=0;
+  uint8_t  nmi_n_old=1;
+  uint8_t  next_instruction;
 
   // Give Teensy 4.1 a moment
   delay (50);
@@ -2051,7 +2040,6 @@ void test_sequence() {
 
     
       next_instruction = finish_read_byte();  
-      assert_sync=0;
       
       switch (next_instruction){
           
