@@ -1,5 +1,8 @@
 // IDE settings: Teensy 4.1, Serial, 600MHz, Faster
 
+// diag cart hangs in modes 2/3 - as if writing to i/o instead of ram during ramtest
+// visual artifacts in mode 2 - bus conflict with VIC?
+
 //
 //
 //  File Name   :  MCL64.c
