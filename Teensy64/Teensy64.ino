@@ -2010,6 +2010,10 @@ void test_sequence() {
   uint16_t local_counter=0;
   uint8_t  nmi_n_old=1;
   uint8_t  next_instruction;
+  uint32_t restore_taptime=0;
+  const uint32_t restore_tapthreshold_max = 250;  // tap within 1/4s
+  const uint32_t restore_tapthreshold_min = 50;   // but no faster than 50Hz (will that interfere with User Port serial I/O?
+  uint8_t  restore_state=0;
 
   // Give Teensy 4.1 a moment
   delay (50);
@@ -2051,7 +2055,20 @@ void test_sequence() {
     
       // Poll for NMI and IRQ
       //
-      if (nmi_n_old==0 && direct_nmi==1)        nmi_handler();          
+      if (nmi_n_old==0 && direct_nmi==1) {
+        uint32_t taptime = millis();
+        if (((taptime-restore_taptime) > restore_tapthreshold_min) && ((taptime-restore_taptime) < restore_tapthreshold_max)) {
+          restore_state++;
+          if (restore_state==3) {
+            restore_state = 0;
+            test_sequence();
+          }
+        } else {
+          restore_state = 0;
+          nmi_handler();
+        }
+        restore_taptime = taptime;
+      }
       if (direct_irq==0x1  && (flag_i)==0x0)    irq_handler(0x0);   
       nmi_n_old = direct_nmi;                                        
 
