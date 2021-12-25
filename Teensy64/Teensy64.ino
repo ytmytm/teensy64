@@ -230,14 +230,8 @@ void setup() {
   pinMode(PIN_DATAOUT7,    OUTPUT);
   pinMode(PIN_DATAOUT_OE_n,  OUTPUT); 
 
-  // this should be within write_port1() function
-  current_p = 7;
-  bank_mode = (EXROM<<4) | (GAME<<3) | (current_p&0x7);
-  io_enabled = ((current_p & CHAREN_BIT) && ((current_p & (HIRAM_BIT | LORAM_BIT)) != 0));
 
-  digitalWriteFast(PIN_P0, 0x1 ); 
-  digitalWriteFast(PIN_P1, 0x1 ); 
-  digitalWriteFast(PIN_P2, 0x1 ); 
+  write_cpu_port(7);
 
   Serial.begin(115200);
 
@@ -457,6 +451,24 @@ inline uint8_t read_byte(uint16_t local_address) {
      }
 } 
 
+// -------------------------------------------------
+// CPU port and internal memory config update
+// -------------------------------------------------
+
+FASTRUN inline void write_cpu_port(uint8_t local_write_data) {
+  digitalWriteFast(PIN_P0,  (local_write_data & 0x01) );
+  digitalWriteFast(PIN_P1,  (local_write_data & 0x02) >> 1 );
+  digitalWriteFast(PIN_P2,  (local_write_data & 0x04) >> 2 );
+  current_p = local_write_data;
+  bank_mode = (EXROM<<4) | (GAME<<3) | (current_p&0x7);
+  // I/O is enabled if BASIC and KERNAL are not both unmapped
+  io_enabled = ((current_p & CHAREN_BIT) && ((current_p & (HIRAM_BIT | LORAM_BIT)) != 0));
+  return;
+}
+
+FASTRUN inline uint8_t read_cpu_port() {
+  return current_p | 0x10;
+}
 
 // -------------------------------------------------
 // Full write cycle with address and data written
@@ -507,15 +519,7 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
        digitalWriteFast(PIN_DATAOUT6,  (local_write_data & 0x40)>>6 ); 
        digitalWriteFast(PIN_DATAOUT7,  (local_write_data & 0x80)>>7 ); 
      
-       if (local_address==0x1) {  
-       digitalWriteFast(PIN_P0,  (local_write_data & 0x01) ); 
-       digitalWriteFast(PIN_P1,  (local_write_data & 0x02) >> 1 ); 
-       digitalWriteFast(PIN_P2,  (local_write_data & 0x04) >> 2 ); 
-       current_p = local_write_data;
-       bank_mode = (EXROM<<4) | (GAME<<3) | (current_p&0x7);
-       io_enabled = ((current_p & CHAREN_BIT) && ((current_p & (HIRAM_BIT | LORAM_BIT)) != 0));
-     }
-     
+       if (local_address==0x1) write_cpu_port(local_write_data);
        
        // During the second CLK phase, enable the data bus output drivers
        //
