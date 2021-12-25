@@ -146,6 +146,7 @@ uint8_t   global_temp=0;
 uint8_t   last_access_internal_RAM=0;
 uint8_t   ea_data=0;
 uint8_t   mode=1;
+uint8_t   current_address_mode=1;
 uint8_t   current_p=0x7;
 uint8_t   bank_mode=0x1f;
 uint8_t   io_enabled=1;
@@ -252,10 +253,12 @@ void setup() {
 // Address range check
 //  Return: 0x0 - All external memory accesses
 //          0x1 - Reads and writes are cycle accurate using internal memory with writes passing through to motherboard
-//          0x2 - Enable speedups, Reads accelerated using internal memory and writes are cycle accurate and pass through to motherboard
+//          0x2 - Enable speedups, Reads accelerated using internal memory with writes passing through to motherboard
 //          0x3 - Enable speedups, All read and write accesses use accelerated internal memory
 // ----------------------------------------------------------
 FASTRUN inline uint8_t internal_address_check(uint16_t local_address) {
+
+  if (mode==0) return 0; // shortcut for external accesses
 
 //  if ( (local_address > 0x0001 ) && (local_address <= 0x03FF) ) return mode;            //   Zero-Page up to video
   if ( (local_address >= 0x0400) && (local_address <= 0x07FF) && mode>1) return 0x1;    //   C64 Video Memory // can't be 3 on boot
@@ -276,7 +279,7 @@ FASTRUN inline uint8_t internal_address_check(uint16_t local_address) {
 // -------------------------------------------------
 // Wait for the CLK1 rising edge and sample signals
 // -------------------------------------------------
-inline void wait_for_CLK_rising_edge() {
+FASTRUN inline void wait_for_CLK_rising_edge() {
   register uint32_t GPIO6_data=0;
   register uint32_t GPIO6_data_d1=0;
   uint32_t   d10, d2, d3, d4, d5, d76;
@@ -309,7 +312,7 @@ inline void wait_for_CLK_rising_edge() {
 // -------------------------------------------------
 // Wait for the CLK1 falling edge 
 // -------------------------------------------------
-inline void wait_for_CLK_falling_edge() {
+FASTRUN inline void wait_for_CLK_falling_edge() {
 
   while (((GPIO6_DR >> 12) & 0x1)==0) {}   // Teensy 4.1 Pin-24  GPIO6_DR[12]  CLK
   while (((GPIO6_DR >> 12) & 0x1)!=0) {}
@@ -320,7 +323,7 @@ inline void wait_for_CLK_falling_edge() {
 // -------------------------------------------------
 // Drive the 6502 Address pins
 // -------------------------------------------------
-inline void send_address(uint32_t local_address) {
+FASTRUN inline void send_address(uint32_t local_address) {
   register uint32_t writeback_data=0;
   
     writeback_data = (0x6DFFFFF3 & GPIO6_DR);   // Read in current GPIOx register value and clear the bits we intend to update
@@ -354,23 +357,21 @@ inline void send_address(uint32_t local_address) {
 // -------------------------------------------------
 // Send the address for a read cyle
 // -------------------------------------------------
-inline void start_read(uint32_t local_address) {
-  
-  current_address = local_address; 
-   
-    if (internal_address_check(current_address)>0x1)  { 
+FASTRUN inline void start_read(uint32_t local_address) {
+
+  current_address = local_address;
+  current_address_mode = internal_address_check(current_address);
+
+  if (current_address_mode>0x1) {
       //last_access_internal_RAM=1;
-    }
+  } else {
+    if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
+    last_access_internal_RAM=0;
 
-    else 
-    {
-       if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
-       last_access_internal_RAM=0;
-
-        digitalWriteFast(PIN_RDWR_n,  0x1);
-        send_address(local_address);
-     }
-    return;
+    digitalWriteFast(PIN_RDWR_n,  0x1);
+    send_address(local_address);
+  }
+  return;
 }
 
 
@@ -378,7 +379,7 @@ inline void start_read(uint32_t local_address) {
 // -------------------------------------------------
 // Fetch data from the correct Bank
 // -------------------------------------------------
-inline uint8_t fetch_byte_from_bank() {
+FASTRUN inline uint8_t fetch_byte_from_bank() {
 
     if ((Page_128_159) && ((EXROM==1 && GAME==0) || (EXROM==0 && ((bank_mode & (HIRAM_BIT|LORAM_BIT))==(HIRAM_BIT|LORAM_BIT))))) {
       return CART_LOW_ROM[current_address & 0x1FFF];
@@ -408,49 +409,50 @@ inline uint8_t fetch_byte_from_bank() {
 // -------------------------------------------------
 // On the rising CLK edge, read in the data
 // -------------------------------------------------
-inline uint8_t finish_read_byte() {  
-  
-  if (internal_address_check(current_address)>0x1)  {
+FASTRUN inline uint8_t finish_read_byte() {
+
+  if (current_address_mode>0x1) {
     last_access_internal_RAM=1;
-    return fetch_byte_from_bank();   
-    }         
-    else 
-    {
-       if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
-       last_access_internal_RAM=0;
-       
-       do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active 
-                      
-       if (internal_address_check(current_address)>0x0)  {  return fetch_byte_from_bank();   }
-       else                                              {  if (current_address==0x1) return (current_p|0x10); else return direct_datain;                  }
-    }
+    return fetch_byte_from_bank();
+  }
+
+  if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
+  last_access_internal_RAM=0;
+
+  do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
+
+  if (current_address==0x1) return current_p|0x10;
+  if (current_address_mode==0) return direct_datain;
+  return fetch_byte_from_bank();
+
 }
-  
 
 
 // -------------------------------------------------
 // Full read cycle with address and data read in
 // -------------------------------------------------
-inline uint8_t read_byte(uint16_t local_address) {  
-  
-  current_address = local_address;
-  
-  if (internal_address_check(local_address)>0x1)  {
-    last_access_internal_RAM=1;
-        return fetch_byte_from_bank(); 
-    }
-    else 
-    {
-       if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
-       last_access_internal_RAM=0;
-       
-       start_read(local_address);
-       do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active 
+inline uint8_t read_byte(uint16_t local_address) {
 
-       if (internal_address_check(current_address)>0x0)  {  return fetch_byte_from_bank();  }
-       else                                              {  if (current_address==0x1) return (current_p|0x10); else return direct_datain;                  }
-     }
-} 
+  current_address = local_address;
+  current_address_mode = internal_address_check(current_address);
+
+  if (current_address_mode>0x1) {
+    last_access_internal_RAM=1;
+    return fetch_byte_from_bank();
+  }
+
+  if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
+  last_access_internal_RAM=0;
+
+  digitalWriteFast(PIN_RDWR_n,  0x1);
+  send_address(local_address);
+  do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
+
+  if (current_address==0x1) return current_p|0x10;
+  if (current_address_mode==0) return direct_datain;
+  return fetch_byte_from_bank();
+
+}
 
 // -------------------------------------------------
 // CPU port and internal memory config update
