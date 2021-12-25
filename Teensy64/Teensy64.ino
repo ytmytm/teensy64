@@ -230,6 +230,7 @@ void setup() {
   pinMode(PIN_DATAOUT7,    OUTPUT);
   pinMode(PIN_DATAOUT_OE_n,  OUTPUT); 
 
+  digitalWriteFast(PIN_RDWR_n, 0x1);
 
   write_cpu_port(7);
 
@@ -473,10 +474,10 @@ FASTRUN inline uint8_t read_cpu_port() {
 // -------------------------------------------------
 // Full write cycle with address and data written
 // -------------------------------------------------
-inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
+FASTRUN inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
 
   // Teensy64 Control Registers, don't pass them to outside bus
-  // if I/O is enabled and BASIC and KERNAL are not both unmapped and the address is one of the special adresses handle the control value
+  // if I/O is enabled and the address is one of the special adresses handle the control value
   if (io_enabled) {
     if ((local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
        switch(local_address) {
@@ -528,6 +529,9 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
        
        wait_for_CLK_rising_edge();
        digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );   
+
+       // restore read mode (needed?)
+       digitalWriteFast(PIN_RDWR_n,  0x1);
   }
   return;
 }
