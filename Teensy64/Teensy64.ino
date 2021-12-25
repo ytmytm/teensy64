@@ -488,6 +488,9 @@ FASTRUN inline void write_byte(uint16_t local_address , uint8_t local_write_data
        }
        return;
     }
+  } else {
+    // I/O not enabled so write to local RAM
+    internal_RAM[local_address] = local_write_data;
   }
 
   // it should be like this (or within 'else' above), but then boot in mode 1 doesn't work, why? (because reading from external i/o doesn't work at all?)
@@ -497,16 +500,12 @@ FASTRUN inline void write_byte(uint16_t local_address , uint8_t local_write_data
   //
   if (internal_address_check(local_address)>0x2)  {
     last_access_internal_RAM=1;
-    internal_RAM[local_address] = local_write_data;
-      //if ( (Page_128_159==0x1)  && ( (EXROM==1 && GAME==0) || ( EXROM==0 && ((bank_mode&0x3)==0x3) ) )) {  } else internal_RAM[local_address] = local_write_data; 
   }
   else 
   {
        if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
        last_access_internal_RAM=0;
-       internal_RAM[local_address] = local_write_data;
-      //if ( (Page_128_159==0x1)  && ( (EXROM==1 && GAME==0) || ( EXROM==0 && ((bank_mode&0x3)==0x3) ) )) {  } else internal_RAM[local_address] = local_write_data; 
-     
+
        digitalWriteFast(PIN_RDWR_n,  0x0);
        send_address(local_address);
 
