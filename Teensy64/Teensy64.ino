@@ -421,7 +421,7 @@ FASTRUN inline uint8_t finish_read_byte() {
 
   do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
 
-  if (current_address==0x1) return current_p|0x10;
+  if (current_address==0x1) return read_cpu_port();
   if (current_address_mode==0) return direct_datain;
   return fetch_byte_from_bank();
 
@@ -448,7 +448,7 @@ inline uint8_t read_byte(uint16_t local_address) {
   send_address(local_address);
   do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
 
-  if (current_address==0x1) return current_p|0x10;
+  if (current_address==0x1) return read_cpu_port();
   if (current_address_mode==0) return direct_datain;
   return fetch_byte_from_bank();
 
@@ -521,8 +521,6 @@ FASTRUN inline void write_byte(uint16_t local_address , uint8_t local_write_data
        digitalWriteFast(PIN_DATAOUT5,  (local_write_data & 0x20)>>5 ); 
        digitalWriteFast(PIN_DATAOUT6,  (local_write_data & 0x40)>>6 ); 
        digitalWriteFast(PIN_DATAOUT7,  (local_write_data & 0x80)>>7 ); 
-     
-       if (local_address==0x1) write_cpu_port(local_write_data);
        
        // During the second CLK phase, enable the data bus output drivers
        //
@@ -534,6 +532,9 @@ FASTRUN inline void write_byte(uint16_t local_address , uint8_t local_write_data
 
        // restore read mode (needed?)
        digitalWriteFast(PIN_RDWR_n,  0x1);
+
+       // handle CPU port write
+       if (local_address==0x1) write_cpu_port(local_write_data);
   }
   return;
 }
