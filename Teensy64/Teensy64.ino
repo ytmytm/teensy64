@@ -284,10 +284,12 @@ FASTRUN inline void wait_for_CLK_rising_edge() {
   register uint32_t GPIO6_data_d1=0;
   uint32_t   d10, d2, d3, d4, d5, d76;
 
+    cli();
     while (((GPIO6_DR >> 12) & 0x1)!=0) {}            // Teensy 4.1 Pin-24  GPIO6_DR[12]     CLK
     
     while (((GPIO6_DR >> 12) & 0x1)==0) {GPIO6_data=GPIO6_DR;}                  // This method is ok for VIC-20 and Apple-II+ non-DRAM ranges 
-    
+    sei();
+
     //do {  GPIO6_data_d1=GPIO6_DR;   } while (((GPIO6_data_d1 >> 12) & 0x1)==0);   // This method needed to support Apple-II+ DRAM read data setup time
     //GPIO6_data=GPIO6_data_d1;
     
@@ -314,8 +316,10 @@ FASTRUN inline void wait_for_CLK_rising_edge() {
 // -------------------------------------------------
 FASTRUN inline void wait_for_CLK_falling_edge() {
 
+  cli();
   while (((GPIO6_DR >> 12) & 0x1)==0) {}   // Teensy 4.1 Pin-24  GPIO6_DR[12]  CLK
   while (((GPIO6_DR >> 12) & 0x1)!=0) {}
+  sei();
   return; 
 }
 
