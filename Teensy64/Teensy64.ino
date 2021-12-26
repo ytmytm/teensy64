@@ -156,6 +156,7 @@ uint8_t   bank_mode=0x1f;
 uint8_t   io_enabled=1;
 uint8_t   EXROM=1;
 uint8_t   GAME=1;
+bool      load_trap_enabled=true;
 
 uint16_t  register_pc=0;
 uint16_t  current_address=0;
@@ -2076,9 +2077,39 @@ void test_sequence() {
       if (direct_irq==0x1  && (flag_i)==0x0)    irq_handler(0x0);   
       nmi_n_old = direct_nmi;                                        
 
-    
       next_instruction = finish_read_byte();  
-      
+
+      // trap I/O
+      if (load_trap_enabled && register_pc==0xffd5) {
+        // check if Kernal is enabled (skip cart_high_rom check?)
+        if ((Page_224_255) && (bank_mode & HIRAM_BIT)) {
+           // is it tape?
+           if (read_byte(0xba)==1) {
+             String filename;
+             uint8_t fnamelen = read_byte(0xb7);
+             uint16_t fname = (read_byte(0xbc) << 8) + read_byte(0xbb);
+             Serial.print("reading filename from "); Serial.print(fname, HEX); Serial.print(" - "); Serial.print(fnamelen); Serial.print(" chars");
+             for (uint8_t i=0; i<fnamelen; i++, fname++) {
+               filename += String(read_byte(fname));
+             }
+             Serial.print("["); Serial.print(filename); Serial.println("]");
+             if (filename.length()==0) { filename="miner.prg"; };
+             size_t bytes = sd_load(filename, &internal_RAM[0x0801], 0x10000-0x0801);
+             // writeback to host RAM if needed
+             if (mode<3) {
+              uint8_t tmp = read_cpu_port();
+              uint16_t start_addr = 0x0801;
+              write_cpu_port(0x00); // 64K RAM
+              for (size_t i=0; i<bytes; i++, start_addr++) {
+                write_byte(start_addr, internal_RAM[start_addr]);
+              }
+              write_cpu_port(tmp); // restore config
+             }
+             next_instruction = 0x60; // RTS
+           }
+        }
+      }
+
       switch (next_instruction){
           
         case 0x00:   irq_handler(0x1); break;  // BRK - Break

@@ -50,3 +50,25 @@ void sd_printdir(void) {
     root = SD.open("/");
     printDirectory(root, 0);
 }
+
+size_t sd_load(String filename, char* mem, size_t size) {
+  File f;
+  size_t bytes;
+  uint8_t b;
+
+  f = SD.open(filename.c_str());
+  bytes = 0;
+  if (f) {
+    // skip loadaddress
+    f.read();
+    f.read();
+    while (f.available() && (bytes<size)) {
+      mem[bytes++] = f.read();
+    }
+    f.close();
+    Serial.print("got "); Serial.print(bytes, HEX); Serial.println(" bytes");
+  } else {
+    Serial.print("ERR: can't open/find file ["); Serial.print(filename); Serial.println("]");
+  }
+  return bytes;
+}
