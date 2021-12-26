@@ -25,7 +25,8 @@
 #define DIR_H_
 
 #include <stdint.h>
-#include "tapecartif.h"
+
+#define FILENAME_LENGTH 16
 
 typedef enum {
   FILE_NONE = 0x00,
