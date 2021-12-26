@@ -45,6 +45,7 @@ void readDir(Directory *dir, char *path)
 	cbm_k_setnam(path);
 	cbm_k_setlfs(15,1,1); // 'verify' dir on LFN=15 with secondary address = 1 ->  change dir to path
 	cbm_k_load(1, (unsigned)dir->elements);
+	strcpy(dir->name, path);
 	POKEW(0x02, MAX_DIR_ELEMENTS); // parameter - how many elements
 	cbm_k_setnam(dir->name); // change dir to provided name
 	cbm_k_setlfs(15,1,0); // 'load' dir on LFN=15 with secondary address = 0 ->  change dir to path and load into dir structure with provided address

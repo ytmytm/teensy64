@@ -7,6 +7,11 @@
 
 */
 
+#include <String.h>
+
+#ifndef __SD_CARD_H
+#define __SD_CARD_H
 void sd_init(void);
 void sd_printdir(void);
-size_t sd_load(String filename, char* mem, size_t size);
+size_t sd_load(String filename, char* mem, uint8_t lfn, uint8_t sa, bool loadmode, uint16_t *loadaddr);
+#endif

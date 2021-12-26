@@ -123,7 +123,7 @@ static void mainLoop(void)
     dir = (Directory *) malloc(sizeof(Directory));
     memset(dir, 0, sizeof(Directory));
 
-    readDir(dir, ".");
+    readDir(dir, "/");
     updateScreen();
 
     do

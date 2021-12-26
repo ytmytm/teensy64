@@ -2090,31 +2090,40 @@ void test_sequence() {
              String filename;
              uint8_t fnamelen = read_byte(0xb7);
              uint16_t fname = (read_byte(0xbc) << 8) + read_byte(0xbb);
+             uint8_t lfn = read_byte(0xb8);
+             uint8_t sa  = read_byte(0xb9);
+             bool loadmode = (register_a==0);
+             uint16_t loadaddr = (register_y << 8) + register_x;
              size_t bytes = 0;
              Serial.print("reading filename from "); Serial.print(fname, HEX); Serial.print(" - "); Serial.print(fnamelen); Serial.print(" chars");
              for (uint8_t i=0; i<fnamelen; i++, fname++) {
-               filename += String(read_byte(fname));
+               filename += String((char)read_byte(fname));
              }
              Serial.print("["); Serial.print(filename); Serial.println("]");
-             //if (filename.length()==0) { filename="miner.prg"; };
              if (filename.length()==0) {
                // SHIFT+RUN/STOP - load the browser
-               memcpy(&internal_RAM[0x0801], &sdbrowser_prg[2], sdbrowser_prg_len);
+               memcpy(&internal_RAM[0x0801], &sdbrowser_prg[2], sdbrowser_prg_len-2);
                bytes = sdbrowser_prg_len;
+               loadaddr  = 0x0801 + sdbrowser_prg_len - 2;
+               register_flags=register_flags&0xFE; // CLC
              } else {
                // if name was set load the specified file
-               bytes = sd_load(filename, &internal_RAM[0x0801], 0x10000-0x0801);
+               // pass all parameters: A (load/verify), X/Y (loadaddr); setlfs, setnam, whole internalRAM; loadaddr will be updated according to file or unchanged
+               bytes = sd_load(filename, internal_RAM, lfn, sa, loadmode, &loadaddr);
+               register_flags=register_flags&0xFE; // CLC
              }
              // writeback to host RAM if needed
              if (mode<3) {
               uint8_t tmp = read_cpu_port();
-              uint16_t start_addr = 0x0801;
               write_cpu_port(0x00); // 64K RAM
-              for (size_t i=0; i<bytes; i++, start_addr++) {
-                write_byte(start_addr, internal_RAM[start_addr]);
+              for (size_t i=0; i<bytes; i++, loadaddr++) {
+                write_byte(loadaddr, internal_RAM[loadaddr]);
               }
               write_cpu_port(tmp); // restore config
              }
+             // set x/y to end address
+             register_x = loadaddr & 0xff;
+             register_y = loadaddr >> 8;
              next_instruction = 0x60; // RTS
            }
         }
