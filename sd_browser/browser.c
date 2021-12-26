@@ -20,7 +20,7 @@
 #include <cbm.h>
 #include <errno.h>
 #include <joystick.h>
-#include "tapecartif.h"
+#include <stdbool.h>
 #include "screen.h"
 #include "dir.h"
 #include "base.h"
@@ -45,7 +45,7 @@ static void printElement(uint16_t pos);
 static char linebuffer[SCREENW+1];
 static Directory *dir = NULL;
 static uint8_t textc = COLOR_LIGHTGREEN;
-static const char *program = "Tapecart SD Browser v1.2";
+static const char *program = "Teensy64 SD Browser v1.0";
 
 #ifdef DIRH
 #undef DIRH
@@ -115,15 +115,6 @@ static void mainLoop(void)
     {
         gotoxy(DIR1X, DIR1Y);
         cputs("Error: Failed to install joystick driver.\n");
-        gotoxy(DIR1X, DIR1Y+2);
-        waitKey();
-        return;
-    }
-
-    if (!tapecart_cmdmode())
-    {
-        gotoxy(DIR1X, DIR1Y);
-        cputs("Error: Tapecart not detected.\n");
         gotoxy(DIR1X, DIR1Y+2);
         waitKey();
         return;
@@ -282,7 +273,6 @@ static void mainLoop(void)
     while (exitflag == 0);
 
     free(dir);
-    tapecart_streammode();
 }
 
 static void changeDir(char *path)
