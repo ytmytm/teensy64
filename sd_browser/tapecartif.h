@@ -35,7 +35,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "../src-firmware/commands.h"
+
+#define CMD_SD_SELECT_FILE 0
+#define CMD_SD_READ_DIR_FAST 0
 
 #define FILENAME_LENGTH 16
 #define LOADER_LENGTH   171
@@ -43,32 +45,10 @@
 bool     tapecart_cmdmode(void);
 void     tapecart_streammode(void);
 void     tapecart_sendbyte(uint8_t byte);
-uint8_t  tapecart_getbyte(void);
 uint8_t  tapecart_getbyte_fast(void);
 
-void     tapecart_send_u24(uint32_t value);
 void     tapecart_send_u16(uint16_t value);
-
-uint32_t tapecart_get_u24(void);
-uint16_t tapecart_get_u16(void);
-
-void     tapecart_read_flash(uint32_t offset, uint16_t len, void *data);
-void     tapecart_read_flash_fast(uint32_t offset, uint16_t len, void *data);
-void     tapecart_load_and_run(uint32_t offset, uint16_t len, uint16_t calladdr);
-void     tapecart_write_flash(uint32_t offset, uint16_t len, const void *data);
-void     tapecart_erase_flashblock(uint32_t offset);
-void     tapecart_erase_64k(uint32_t offset);
-
-void     tapecart_read_loader(uint8_t *data);
-void     tapecart_write_loader(const uint8_t *data);
-void     tapecart_read_loadinfo(uint16_t *offset, uint16_t *length, uint16_t *calladdr, char *filename);
-void     tapecart_write_loadinfo(const uint16_t offset,
-                                 const uint16_t length,
-                                 const uint16_t calladdr,
-                                 const char    *filename);
-
-void     tapecart_read_sizes(uint32_t *total_size, uint16_t *page_size, uint16_t *erase_pages);
-
 void     tapecart_open_dir(char *path, char *new_path);
+void     tapecart_read_loader(uint8_t *data);
 
 #endif
