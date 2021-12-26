@@ -1,10 +1,10 @@
 all: sdbrowser.h
 
-browser.prg:
-	cl65 -t c64 -Oi screen.c browser.c dir.c base.c loader.s -o browser.prg
+sdbrowser.prg:
+	cl65 -t c64 -Oi screen.c browser.c dir.c base.c loader.s -o sdbrowser.prg
 
-sdbrowser.h: browser.prg
-	xxd -i browser.prg > sdbrowser.h
+sdbrowser.h: sdbrowser.prg
+	xxd -i sdbrowser.prg > sdbrowser.h
 
 clean:
-	rm -rf *.o browser.prg
+	rm -rf *.o sdbrowser.prg sdbrowser.h
