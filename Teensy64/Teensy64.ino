@@ -181,6 +181,8 @@ uint8_t   CART_HIGH_ROM[0x2000]; // CART_HIGH_ROM empty
 int       incomingByte;   
 
 #include "sd_card.h"
+// include C64 browser code for SHIFT+RUN/STOP
+#include "sdbrowser.h"
 
 // ------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------
@@ -2088,13 +2090,21 @@ void test_sequence() {
              String filename;
              uint8_t fnamelen = read_byte(0xb7);
              uint16_t fname = (read_byte(0xbc) << 8) + read_byte(0xbb);
+             size_t bytes = 0;
              Serial.print("reading filename from "); Serial.print(fname, HEX); Serial.print(" - "); Serial.print(fnamelen); Serial.print(" chars");
              for (uint8_t i=0; i<fnamelen; i++, fname++) {
                filename += String(read_byte(fname));
              }
              Serial.print("["); Serial.print(filename); Serial.println("]");
-             if (filename.length()==0) { filename="miner.prg"; };
-             size_t bytes = sd_load(filename, &internal_RAM[0x0801], 0x10000-0x0801);
+             //if (filename.length()==0) { filename="miner.prg"; };
+             if (filename.length()==0) {
+               // SHIFT+RUN/STOP - load the browser
+               memcpy(&internal_RAM[0x0801], &sdbrowser_prg[2], sdbrowser_prg_len);
+               bytes = sdbrowser_prg_len;
+             } else {
+               // if name was set load the specified file
+               bytes = sd_load(filename, &internal_RAM[0x0801], 0x10000-0x0801);
+             }
              // writeback to host RAM if needed
              if (mode<3) {
               uint8_t tmp = read_cpu_port();
