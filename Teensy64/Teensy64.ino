@@ -1,3 +1,4 @@
+
 // IDE settings: Teensy 4.1, Serial, 600MHz, Faster
 
 // diag cart hangs in modes 2/3 - as if writing to i/o instead of ram during ramtest
@@ -178,9 +179,8 @@ uint8_t   CART_HIGH_ROM[0x2000]; // CART_HIGH_ROM empty
 
 int       incomingByte;   
 
+#include "sd_card.h"
 
-
-    
 // ------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------
 
@@ -240,6 +240,7 @@ void setup() {
 
   Serial.begin(115200);
 
+  sd_init();
 }
 
 
@@ -2049,6 +2050,7 @@ void test_sequence() {
             case 'G': GAME=1; reset_sequence(); Serial.println("GAME=1"); break;
             case 't': Serial.println("TEST"); test_sequence(); break;
             case '?': Serial.print("M"); Serial.print(mode); Serial.print(" EXROM"); Serial.print(EXROM); Serial.print(" GAME"); Serial.println(GAME); break;
+            case '$': sd_printdir(); break;
           }
         }
       }
