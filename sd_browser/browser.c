@@ -298,18 +298,11 @@ static void changeDir(char *path)
 
 static void execute(char *prg)
 {
-    uint8_t i;
+    prg[FILENAME_LENGTH]='\0';
+    cbm_k_setnam(prg);
+    cbm_k_setlfs(1,1,1);
 
-    tapecart_sendbyte(CMD_SD_SELECT_FILE);
-    for (i = 0; i < FILENAME_LENGTH; ++i)
-    {
-        tapecart_sendbyte(prg[i]);
-    }
-
-    // install loader
-    tapecart_read_loader((uint8_t *)0x0351);
-
-    load_and_run();
+    load_and_run(); // this calls cbm_k_load(0,0);
     while(true);
 }
 

@@ -1,7 +1,8 @@
-.import _minidelay
 .export _load_and_run
 
-loader = $0351
+calladdr   = $aa
+endaddr    = $ac
+loadaddr   = $ae
 
 ; =============================================================================
 ; void load_and_run();
@@ -27,7 +28,7 @@ _load_and_run:
         ; initialize system constants (RAMTAS without RAM-test)
         lda #$00
         tay
-:       sta $0002,y
+:       ;sta $0002,y
         sta $0200,y
         sta $023c,y     ; don't clear the datasette buffer
         iny
@@ -76,13 +77,37 @@ restore_upper:
         lda #$00
         sta $325
 
-        lda #$07     ; motor on, leave command mode
-        sta $01
-        
-        jsr _minidelay
+loader:
+        ror $d011               ; blank screen
 
-        lda #$10    ; wait until sense is high
-:       bit $01
-        beq :-
-        
-        jmp loader
+        sei
+        ldx #$00
+        stx $c6                 ; clear keyboard buffer
+
+; read here
+; ffd5
+; update aa/ab to call address
+; update ac/ad to end address
+; update ae/af to load address
+
+	lda #0
+	tax
+	tay
+	jsr $ffd5		; LOAD
+
+        sec                     ; turn screen on
+        rol $d011
+
+	; A/X is the end address here
+	lda $ac
+	ldx $ad
+        stx $2e                 ; update BASIC pointers
+        stx $30                 ; (FIXME: Check if one of the ROM calls helps here)
+        stx $32
+        sta $2d
+        sta $2f
+        sta $31
+
+        cli                     ; enable interrupts
+        jsr $e453               ; restore vectors
+        jmp (calladdr)
