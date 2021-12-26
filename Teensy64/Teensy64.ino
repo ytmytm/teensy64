@@ -2056,11 +2056,13 @@ void test_sequence() {
       // Poll for NMI and IRQ
       //
       if (nmi_n_old==0 && direct_nmi==1) {
+        // check if we should intercept RESTORE taps
         uint32_t taptime = millis();
         if (((taptime-restore_taptime) > restore_tapthreshold_min) && ((taptime-restore_taptime) < restore_tapthreshold_max)) {
           restore_state++;
           if (restore_state==3) {
             restore_state = 0;
+            // yes - do something like a freezer cartridge menu
             test_sequence();
           }
         } else {
