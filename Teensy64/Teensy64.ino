@@ -542,9 +542,9 @@ FASTRUN inline void write_byte(uint16_t local_address , uint8_t local_write_data
        // restore read mode (needed?)
        digitalWriteFast(PIN_RDWR_n,  0x1);
 
-       // handle CPU port write
-       if (local_address==0x1) write_cpu_port(local_write_data);
   }
+  // handle CPU port write
+  if (local_address==0x1) write_cpu_port(local_write_data);
   return;
 }
 
