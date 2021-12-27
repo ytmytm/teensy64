@@ -57,10 +57,17 @@ _load_and_run:
         lda #>chrin_trap
         sta $325
 
-        lda #$01    ; set current file (emulate read from drive 8)
-        ldx #$08
-        tay
+        lda #$01    ; set current file (emulate read from tape)
+        ldx #$01
+        tay			; sa<>0 so file header info is used
         jsr $ffba   ; SETLFS - set file parameters
+
+		ldx #0
+:		lda loader,x
+		sta $0351,x
+		inx
+		cpx #(loaderend-loader+1)
+		bne :-
 
         jmp $fcfe   ; Start BASIC
 
@@ -76,31 +83,28 @@ restore_lower:
 restore_upper:
         lda #$00
         sta $325
+		jmp $0351
 
+		;; only fully relocatable code below
 loader:
-        ror $d011               ; blank screen
-
         sei
         ldx #$00
         stx $c6                 ; clear keyboard buffer
 
-; read here
-; ffd5
-; update aa/ab to call address
+		lda #0
+		tax
+		tay
+		jsr $ffd5				; LOAD
+		stx $ac					; end address
+		sty $ad
+
+; update aa/ab to call address (if == 0 then do BASIC RUN)
 ; update ac/ad to end address
 ; update ae/af to load address
 
-	lda #0
-	tax
-	tay
-	jsr $ffd5		; LOAD
-
-        sec                     ; turn screen on
-        rol $d011
-
-	; A/X is the end address here
-	lda $ac
-	ldx $ad
+		; A/X is the end address here
+		lda $ac
+		ldx $ad
         stx $2e                 ; update BASIC pointers
         stx $30                 ; (FIXME: Check if one of the ROM calls helps here)
         stx $32
@@ -110,4 +114,8 @@ loader:
 
         cli                     ; enable interrupts
         jsr $e453               ; restore vectors
-        jmp (calladdr)
+		;
+		jsr $a659    			; set basic pointer and CLR
+		jmp $a7ae    			; RUN 
+        jmp (calladdr)			; XXX start ML program if load address <> $0801
+loaderend:
