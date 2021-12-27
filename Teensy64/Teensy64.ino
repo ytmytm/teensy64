@@ -1854,18 +1854,18 @@ void opcode_0xFC() {  Fetch_Absolute_X(1);  Begin_Fetch_Next_Opcode(); return;  
 // --------------------------------------------------------------------------------------------------
 // JAM - Lock up the processor
 // --------------------------------------------------------------------------------------------------
-void opcode_0x02() {  Fetch_Immediate();   while (1) {}    return;  }  // 0x02 - JAM
-void opcode_0x12() {  Fetch_Immediate();   while (1) {}    return;  }  // 0x12 - JAM
-void opcode_0x22() {  Fetch_Immediate();   while (1) {}    return;  }  // 0x22 - JAM
-void opcode_0x32() {  Fetch_Immediate();   while (1) {}    return;  }  // 0x32 - JAM
-void opcode_0x42() {  Fetch_Immediate();   while (1) {}    return;  }  // 0x42 - JAM
-void opcode_0x52() {  Fetch_Immediate();   while (1) {}    return;  }  // 0x52 - JAM
-void opcode_0x62() {  Fetch_Immediate();   while (1) {}    return;  }  // 0x62 - JAM
-void opcode_0x72() {  Fetch_Immediate();   while (1) {}    return;  }  // 0x72 - JAM
-void opcode_0x92() {  Fetch_Immediate();   while (1) {}    return;  }  // 0x92 - JAM
-void opcode_0xB2() {  Fetch_Immediate();   while (1) {}    return;  }  // 0xB2 - JAM
-void opcode_0xD2() {  Fetch_Immediate();   while (1) {}    return;  }  // 0xD2 - JAM
-void opcode_0xF2() {  Fetch_Immediate();   while (1) {}    return;  }  // 0xF2 - JAM
+void opcode_0x02() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0x02 - JAM
+void opcode_0x12() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0x12 - JAM
+void opcode_0x22() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0x22 - JAM
+void opcode_0x32() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0x32 - JAM
+void opcode_0x42() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0x42 - JAM
+void opcode_0x52() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0x52 - JAM
+void opcode_0x62() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0x62 - JAM
+void opcode_0x72() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0x72 - JAM
+void opcode_0x92() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0x92 - JAM
+void opcode_0xB2() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0xB2 - JAM
+void opcode_0xD2() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0xD2 - JAM
+void opcode_0xF2() {  Fetch_Immediate();   handle_JAM();    return;  }  // 0xF2 - JAM
 
 
 // --------------------------------------------------------------------------------------------------
@@ -1981,7 +1981,16 @@ void opcode_0xAB() {
     Begin_Fetch_Next_Opcode(); 
     return;  
     }   
-    
+
+// --------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------
+
+void handle_JAM() {
+  Serial.print("JAM! at $"); Serial.println(register_pc, HEX);
+
+  // wait for RESET to assert and return control to the loop
+  while (digitalReadFast(PIN_RESET)==0) {}                        // Stay here until RESET asserts
+}
 
 // --------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------
