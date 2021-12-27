@@ -88,7 +88,7 @@ size_t sd_load(String filename, char* mem, uint8_t lfn, uint8_t sa, bool loadmod
 
   Serial.print("in sd_load with filename=["); Serial.print(filename); Serial.print("], lfn="); Serial.print(lfn); Serial.print(" sa="); Serial.print(sa); Serial.print(" loadmode="); Serial.print(loadmode); Serial.print(" loadaddr="); Serial.println(loadaddr[0], HEX);
 
-  // handle cd ..
+  // handle cd .. and pass through
   if (filename.equals("..")) {
     // strip cwd up until first slash
     Serial.print("..:["); Serial.print(cwd); Serial.println("]");
@@ -96,7 +96,7 @@ size_t sd_load(String filename, char* mem, uint8_t lfn, uint8_t sa, bool loadmod
     if (i<=0) { cwd = "/"; }; // not found or only slash
     if (i>0) { cwd = cwd.substring(0, i); }; // trim up to last slash
     Serial.print("after:["); Serial.print(cwd); Serial.println("]");
-    return 0;
+    filename = cwd;
   }
 
   // setup full path to the file
@@ -112,13 +112,10 @@ size_t sd_load(String filename, char* mem, uint8_t lfn, uint8_t sa, bool loadmod
   if (f) {
     if (f.isDirectory()) {
       bytes = 0;
-      if (lfn==15 && sa==1 && !loadmode) {
-        Serial.print("CD to ["); Serial.print(fullpath); Serial.println("]");
-        cwd = fullpath;
-      }
       if (lfn==15 && sa==0 && loadmode) {
-        Serial.print("already CDed to ["); Serial.print(fullpath); Serial.println("] and list");
+        Serial.print("CD to ["); Serial.print(fullpath); Serial.println("] and list");
         bytes = sd_browser_dir((struct direlement *)&mem[loadaddr[0]], f);
+        cwd = fullpath;
       }
       f.close();
       return bytes;
