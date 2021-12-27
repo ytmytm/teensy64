@@ -2102,6 +2102,7 @@ void test_sequence() {
              uint8_t sa  = read_byte(0xb9);
              bool loadmode = (register_a==0);
              uint16_t loadaddr = (register_y << 8) + register_x;
+             uint16_t basicaddr = (read_byte(0x2c) << 8) + read_byte(0x2b);
              size_t bytes = 0;
              Serial.print("reading filename from "); Serial.print(fname, HEX); Serial.print(" - "); Serial.print(fnamelen); Serial.print(" chars");
              for (uint8_t i=0; i<fnamelen; i++, fname++) {
@@ -2112,8 +2113,8 @@ void test_sequence() {
              if (filename.length()==0) {
                Serial.println("empty fname - load internal browser");
                // SHIFT+RUN/STOP - load the browser
-               loadaddr = 0x0801;
-               memcpy(&internal_RAM[0x0801], &sdbrowser_prg[2], sdbrowser_prg_len-2);
+               loadaddr = basicaddr;
+               memcpy(&internal_RAM[basicaddr], &sdbrowser_prg[2], sdbrowser_prg_len-2);
                bytes = sdbrowser_prg_len-2;
                register_flags=register_flags&0xFE; // CLC
              } else {
@@ -2122,7 +2123,14 @@ void test_sequence() {
                bytes = sd_load(filename, internal_RAM, lfn, sa, loadmode, &loadaddr);
                register_flags=register_flags&0xFE; // CLC
              }
-             // writeback to host RAM if needed
+             // update KERNAL pointers
+             write_byte(0xac, loadaddr & 0xff);
+             write_byte(0xad, loadaddr << 8);
+             if (loadaddr!=basicaddr) {
+              write_byte(0xaa, loadaddr & 0xff);  // update calladdr for sd_browser
+              write_byte(0xab, loadaddr << 8);
+             }
+             // data is only in internal_RAM, writeback to host RAM if needed
              if (mode<3) {
               uint8_t tmp = read_cpu_port();
               write_cpu_port(0x00); // 64K RAM
@@ -2130,6 +2138,8 @@ void test_sequence() {
                 write_byte(loadaddr, internal_RAM[loadaddr]);
               }
               write_cpu_port(tmp); // restore config
+             } else {
+              loadaddr += bytes;
              }
              // set x/y to end address
              register_x = loadaddr & 0xff;

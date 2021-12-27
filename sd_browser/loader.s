@@ -1,8 +1,8 @@
 .export _load_and_run
 
 calladdr   = $aa
-endaddr    = $ac
-loadaddr   = $ae
+loadaddr   = $ac
+endaddr    = $ae
 
 ; =============================================================================
 ; void load_and_run();
@@ -28,7 +28,7 @@ _load_and_run:
         ; initialize system constants (RAMTAS without RAM-test)
         lda #$00
         tay
-:       ;sta $0002,y
+:       ;sta $0002,y	; don't clear zeropage - there are LOAD parameters there
         sta $0200,y
         sta $023c,y     ; don't clear the datasette buffer
         iny
@@ -92,30 +92,33 @@ loader:
         stx $c6                 ; clear keyboard buffer
 
 		lda #0
+		sta calladdr
+		sta calladdr+1			; reset call address, Teensy will update it if load address<>$0801
 		tax
 		tay
 		jsr $ffd5				; LOAD
-		stx $ac					; end address
-		sty $ad
+		stx endaddr				; end address
+		sty endaddr+1
 
 ; update aa/ab to call address (if == 0 then do BASIC RUN)
-; update ac/ad to end address
-; update ae/af to load address
+; update ac/ad to load address
+; update ae/af to end address (through x/y)
 
-		; A/X is the end address here
-		lda $ac
-		ldx $ad
-        stx $2e                 ; update BASIC pointers
-        stx $30                 ; (FIXME: Check if one of the ROM calls helps here)
-        stx $32
-        sta $2d
-        sta $2f
-        sta $31
+		; X/Y is the end address here
+        sty $2e                 ; update BASIC pointers
+        sty $30                 ; (FIXME: Check if one of the ROM calls helps here)
+        sty $32
+        stx $2d
+        stx $2f
+        stx $31
 
         cli                     ; enable interrupts
         jsr $e453               ; restore vectors
 		;
-		jsr $a659    			; set basic pointer and CLR
-		jmp $a7ae    			; RUN 
-        jmp (calladdr)			; XXX start ML program if load address <> $0801
+		lda calladdr
+		ora calladdr+1
+		bne :+					; start ML program
+		jsr $a659    			; or set basic pointer and CLR
+		jmp $a7ae    			; and RUN
+:        jmp (calladdr)			; start ML program if load address <> $0801
 loaderend:
