@@ -2053,7 +2053,6 @@ void test_sequence() {
             case 'G': GAME=1; reset_sequence(); Serial.println("GAME=1"); break;
             case 't': Serial.println("TEST"); test_sequence(); break;
             case '?': Serial.print("M"); Serial.print(mode); Serial.print(" EXROM"); Serial.print(EXROM); Serial.print(" GAME"); Serial.println(GAME); break;
-            case '$': sd_printdir(); break;
           }
         }
       }
@@ -2100,11 +2099,13 @@ void test_sequence() {
                filename += String((char)read_byte(fname));
              }
              Serial.print("["); Serial.print(filename); Serial.println("]");
+             Serial.print("load trap with filename=["); Serial.print(filename); Serial.print("], lfn="); Serial.print(lfn); Serial.print(" sa="); Serial.print(sa); Serial.print(" loadmode="); Serial.print(loadmode); Serial.print(" loadaddr="); Serial.println(loadaddr, HEX);
              if (filename.length()==0) {
+               Serial.println("empty fname - load internal browser");
                // SHIFT+RUN/STOP - load the browser
+               loadaddr = 0x0801;
                memcpy(&internal_RAM[0x0801], &sdbrowser_prg[2], sdbrowser_prg_len-2);
-               bytes = sdbrowser_prg_len;
-               loadaddr  = 0x0801 + sdbrowser_prg_len - 2;
+               bytes = sdbrowser_prg_len-2;
                register_flags=register_flags&0xFE; // CLC
              } else {
                // if name was set load the specified file

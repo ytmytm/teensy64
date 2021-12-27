@@ -51,9 +51,9 @@ typedef struct direlement {
 
 typedef struct {
   char name[FILENAME_LENGTH+1];
-  DirElement elements[MAX_DIR_ELEMENTS];
   uint16_t no_of_elements;
   uint16_t selected;
+  DirElement elements[MAX_DIR_ELEMENTS];
 } Directory;
 
 void readDir(Directory *dir, char *path);
