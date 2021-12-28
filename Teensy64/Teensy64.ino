@@ -1,9 +1,6 @@
 
 // IDE settings: Teensy 4.1, Serial, 600MHz, Faster
 
-// diag cart hangs in modes 2/3 - as if writing to i/o instead of ram during ramtest
-// visual artifacts in mode 2 - bus conflict with VIC?
-
 //
 //
 //  File Name   :  MCL64.c
@@ -513,8 +510,11 @@ FASTRUN inline void write_byte(uint16_t local_address , uint8_t local_write_data
   }
   else 
   {
-       if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
-       last_access_internal_RAM=0;
+       //WAS: if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
+       if (last_access_internal_RAM==1) {
+         do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
+         last_access_internal_RAM=0;
+       }
 
        digitalWriteFast(PIN_RDWR_n,  0x0);
        send_address(local_address);
