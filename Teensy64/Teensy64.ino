@@ -154,6 +154,7 @@ uint8_t   io_enabled=1;
 uint8_t   EXROM=1;
 uint8_t   GAME=1;
 bool      load_trap_enabled=true;
+bool      reu_emulation_enabled=true;
 
 uint16_t  register_pc=0;
 uint16_t  current_address=0;
@@ -173,8 +174,16 @@ uint8_t   CART_HIGH_ROM[0x2000]; // CART_HIGH_ROM empty
 #define LORAM_BIT	0x01
 
 #define TEENSY64_REGISTER_BASE	0xd030
-#define TEENSY64_REGISTER_SIZE	0x01
+#define TEENSY64_REGISTER_SIZE	0x03
 
+uint8_t teensy64_registers[TEENSY64_REGISTER_SIZE];
+/* register set at $d030 (53296)
+ *  0x00 - xxxxxxx0 - clear: cycle exact, set: enable speedup mode from register 0x01 (by default mode 1) (for C128 2MHz compatibility)
+ *  0x01 - xxxxxx10 - mode number for speedup (1, 2 or 3), no speedup with mode 1
+ *  0x02 - xxxxxxx0 - clear: enable mode 0 (external cartridge) and RESET, set: enable mode 1 (internal RAM), no RESET
+ *         xxxxxx1x - clear: no REU emulation, set: emulate REU (default: enabled)
+ *         xxxxx2xx - clear: no LOAD trap, set: enable LOAD trap (default: enabled)
+ */
 
 #include "sd_card.h"
 // include C64 browser code for SHIFT+RUN/STOP
@@ -235,6 +244,13 @@ void setup() {
 
   digitalWriteFast(PIN_RDWR_n, 0x1);
 
+  // setup registers and state
+  teensy64_registers[0x00] = 0x00; // no speedup
+  teensy64_registers[0x01] = 0x02; // use mode 2 (read from IRAM, write to DRAM, enable CPU speedups) for speedup
+  teensy64_registers[0x02] = 0x07; // enable mode 1, enable REU emulation, enable LOAD trap
+
+  update_teensy64_setup();
+
   write_cpu_port(7);
 
   Serial.begin(115200);
@@ -242,6 +258,20 @@ void setup() {
   sd_init();
 }
 
+FASTRUN inline void update_teensy64_setup() {
+  if (teensy64_registers[0x01]==0) teensy64_registers[0x01]=1; // correct speedup mode to 1, can't be 0
+  if (teensy64_registers[0x02] & 0x01) {
+    if (teensy64_registers[0x00] & 0x01) { // is speedup enabled?
+      mode = teensy64_registers[0x01]; // yes, use specified speedup mode
+    } else {
+      mode = 1; // no, mode 1 (cycle exact with internal RAM/ROM/CRT)
+    }
+  } else {
+    mode = 0; // without any speedup, pass all accesses to external bus
+  }
+  load_trap_enabled =     teensy64_registers[0x02] & 0x02;
+  reu_emulation_enabled = teensy64_registers[0x02] & 0x04;
+}
 
 // --------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------
@@ -418,6 +448,12 @@ FASTRUN inline uint8_t fetch_byte_from_bank() {
 // -------------------------------------------------
 FASTRUN inline uint8_t finish_read_byte() {
 
+  if (io_enabled) {
+    if ((current_address >= TEENSY64_REGISTER_BASE) && (current_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
+      return teensy64_registers[current_address-TEENSY64_REGISTER_BASE];
+    }
+  }
+
   if (current_address_mode>0x1) {
     last_access_internal_RAM=1;
     return fetch_byte_from_bank();
@@ -483,16 +519,20 @@ FASTRUN inline uint8_t read_cpu_port() {
 // -------------------------------------------------
 // Full write cycle with address and data written
 // -------------------------------------------------
-FASTRUN inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
+inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
 
   // Teensy64 Control Registers, don't pass them to outside bus
   // if I/O is enabled and the address is one of the special adresses handle the control value
   if (io_enabled) {
     if ((local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
+       //Serial.print("R: $"); Serial.print(local_address, HEX), Serial.print(" <- $"); Serial.println(local_write_data, HEX);
        switch(local_address) {
-         case TEENSY64_REGISTER_BASE+0: mode = (local_write_data & 0x03); Serial.print("M"); Serial.println(mode); break; // trim to lowest two bits
-         default: Serial.print("E: unknown access to $"); Serial.println(local_address, HEX); break;
+         case TEENSY64_REGISTER_BASE+0: teensy64_registers[0x00] = local_write_data & 0x01; break; // 1 bit
+         case TEENSY64_REGISTER_BASE+1: teensy64_registers[0x01] = local_write_data & 0x03; break; // 1, 2 or 3, 0 will be filpped to 1
+         case TEENSY64_REGISTER_BASE+2: teensy64_registers[0x02] = local_write_data & 0x07; break; // 3 bits
+         default: break;
        }
+       update_teensy64_setup();
        return;
     }
   }
@@ -2061,7 +2101,10 @@ void test_sequence() {
             case 'g': GAME=0; reset_sequence(); Serial.println("GAME=0"); break;
             case 'G': GAME=1; reset_sequence(); Serial.println("GAME=1"); break;
             case 't': Serial.println("TEST"); test_sequence(); break;
-            case '?': Serial.print("M"); Serial.print(mode); Serial.print(" EXROM"); Serial.print(EXROM); Serial.print(" GAME"); Serial.println(GAME); break;
+            case '?': Serial.print("M"); Serial.print(mode); Serial.print(" EXROM"); Serial.print(EXROM); Serial.print(" GAME"); Serial.println(GAME); 
+                Serial.print("Setup: mode="); Serial.print(mode); Serial.print(" LOAD:"); Serial.print(load_trap_enabled); Serial.print(" REU:"); Serial.println(reu_emulation_enabled);
+                break;
+            default: break;
           }
         }
       }
