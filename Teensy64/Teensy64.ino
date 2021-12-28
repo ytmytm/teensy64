@@ -175,7 +175,6 @@ uint8_t   CART_HIGH_ROM[0x2000]; // CART_HIGH_ROM empty
 #define TEENSY64_REGISTER_BASE	0xd030
 #define TEENSY64_REGISTER_SIZE	0x01
 
-int       incomingByte;   
 
 #include "sd_card.h"
 // include C64 browser code for SHIFT+RUN/STOP
@@ -2027,6 +2026,7 @@ void test_sequence() {
   const uint32_t restore_tapthreshold_max = 250;  // tap within 1/4s
   const uint32_t restore_tapthreshold_min = 50;   // but no faster than 50Hz (will that interfere with User Port serial I/O?
   uint8_t  restore_state=0;
+  int incomingByte;
 
   // Give Teensy 4.1 a moment
   delay (50);
