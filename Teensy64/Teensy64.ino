@@ -550,7 +550,6 @@ FASTRUN inline uint8_t fetch_byte_from_bank() {
       }
       if (reu_emulation_enabled) {
         if ((current_address >= REU_REGISTER_BASE) && (current_address <= (REU_REGISTER_BASE+0x100))) {
-//          if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print("read $"); Serial.print(current_address,HEX); Serial.print(" = "); Serial.println(reu_registers[current_address & 0x001f],HEX); };
           return reu_registers[current_address & 0x001f]; // 5 address bits connected, shadow every $20 bytes
         }
       }
@@ -597,9 +596,7 @@ FASTRUN inline uint8_t finish_read_byte() {
   do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
 
   if (current_address==0x1) return read_cpu_port();
-//  if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print(io_enabled); Serial.print("finish_read: before read $"); Serial.print(current_address,HEX); Serial.println(" from direct");};
   if (current_address_mode==0) return direct_datain;
-//  if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print(io_enabled); Serial.print("finish_read: before read $"); Serial.print(current_address,HEX); Serial.println(" from bank");};
 
   return fetch_byte_from_bank();
 
@@ -627,9 +624,7 @@ inline uint8_t read_byte(uint16_t local_address) {
   do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
 
   if (current_address==0x1) return read_cpu_port();
-//  if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print(io_enabled); Serial.print(" read_byte: before read $"); Serial.print(current_address,HEX); Serial.println(" from direct");};
   if (current_address_mode==0) return direct_datain;
-//  if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print(io_enabled); Serial.print(" read_byte: before read $"); Serial.print(current_address,HEX); Serial.println(" from bank");};
   return fetch_byte_from_bank();
 
 }
@@ -674,7 +669,6 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
     }
     if (reu_emulation_enabled) {
       if ((local_address >= REU_REGISTER_BASE) && (local_address <= (REU_REGISTER_BASE+0x100))) {
-        //if ((local_address==0xdf04) || (local_address==0xdf05)) { Serial.print("write $"); Serial.print(local_address,HEX); Serial.print(" from "); Serial.print(reu_registers[local_address & 0x001f],HEX); Serial.print(" to "); Serial.print(local_write_data, HEX); };
         reu_registers[local_address & 0x001f] = local_write_data;
 	      if (((local_address & 0x001f)==0x01) && (local_write_data & 0x80)) { // command register with 7th bit set?
 	        reu_execute(local_write_data & 0x03);
