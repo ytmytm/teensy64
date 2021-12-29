@@ -966,12 +966,9 @@ void reset_sequence() {
                 
     digitalWriteFast(PIN_RDWR_n,  0x1);         
     digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );  
-    
-    digitalWriteFast(PIN_P0, 0x1 ); 
-    digitalWriteFast(PIN_P1, 0x1 ); 
-    digitalWriteFast(PIN_P2, 0x1 );           
-            
-            
+
+    write_cpu_port(7);
+
     temp1 = read_byte(register_pc);                                 // Address ??
     temp1 = read_byte(register_pc+1);                               // Address ?? + 1
     temp1 = read_byte(register_sp_fixed);                           // Address SP
