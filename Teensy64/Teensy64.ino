@@ -185,6 +185,12 @@ uint8_t teensy64_registers[TEENSY64_REGISTER_SIZE];
  *         xxxxx2xx - clear: no LOAD trap, set: enable LOAD trap (default: enabled)
  */
 
+#define REU_REGISTER_BASE 0xdf00
+#define REU_REGISTER_SIZE 32 // REU has 5 address lines connected, mirrors every 32 bytes
+uint8_t reu_registers[REU_REGISTER_SIZE] = { 0x10, 0x10, 0, 0, 0, 0, 0xf8, 0xff, 0xff, 0x1f, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+uint8_t reu_bank0[65536*4]; // 256K because we run out of RAM in Teensy RAM0
+uint8_t *reu_bank1; // has to be dynamically allocated
+
 #include "sd_card.h"
 // include C64 browser code for SHIFT+RUN/STOP
 #include "sdbrowser.h"
@@ -250,12 +256,118 @@ void setup() {
   teensy64_registers[0x02] = 0x07; // enable mode 1, enable REU emulation, enable LOAD trap
 
   update_teensy64_setup();
+  reu_init();
 
   write_cpu_port(7);
 
   Serial.begin(115200);
 
   sd_init();
+}
+
+void reu_init() {
+  // allocate upper 256K bank in RAM1
+  reu_bank1 = malloc(4*65536); // 256K
+  memset(reu_bank0, 0, 4*65536);
+  memset(reu_bank1, 0, 4*65536);
+}
+
+inline uint8_t reu_read_byte(uint32_t reu_addr) {
+   uint32_t bankaddr = reu_addr & 0x0003ffff;
+   bool highbank = reu_addr & 0x00040000;
+   if (highbank) {
+      return reu_bank1[bankaddr];
+   } else {
+      return reu_bank0[bankaddr];
+   }
+}
+
+inline void reu_write_byte(uint32_t reu_addr, uint8_t b) {
+   uint32_t bankaddr = reu_addr & 0x0003ffff;
+   bool highbank = reu_addr & 0x00040000;
+   if (highbank) {
+      reu_bank1[bankaddr] = b;
+   } else {
+      reu_bank0[bankaddr] = b;
+   }
+}
+
+void reu_execute(uint8_t op) {
+  uint16_t c64_addr = reu_registers[2] + (reu_registers[3] << 8);
+  uint32_t reu_addr = reu_registers[4] + (reu_registers[5] << 8) + (reu_registers[6] << 16);
+  uint16_t reu_len  = reu_registers[7] + (reu_registers[8] << 8);
+  uint8_t b, c;
+  uint8_t verify_error = 0;
+  uint16_t verify_pos = 0;
+  if (reu_len==0) reu_len = 0x10000; // full 64K
+  Serial.print("REU:[");
+  for (uint8_t i=0; i<11; i++) {
+    Serial.print(reu_registers[i], HEX); Serial.print(" ");
+  }
+  Serial.print("] c64:$"); Serial.print(c64_addr, HEX); Serial.print(" REU:"); Serial.print(reu_addr, HEX); Serial.print(" len:$"); Serial.print(reu_len, HEX); Serial.print(" ");
+  switch (op) {
+    case 0x00:
+	    Serial.println("C64->REU");
+	    for (uint16_t i=0; i<reu_len; i++) {
+	      reu_write_byte(reu_addr+i, read_byte(c64_addr+i));
+	    }
+	    break;
+    case 0x01:
+      Serial.println("REU->C64");
+	    for (uint16_t i=0; i<reu_len; i++) {
+	      write_byte(c64_addr+i, reu_read_byte(reu_addr+i));
+	    }
+	    break;
+    case 0x02:
+      Serial.println("swap");
+	    for (uint16_t i=0; i<reu_len; i++) {
+	      b = reu_read_byte(reu_addr+i);
+	      reu_write_byte(reu_addr+i, read_byte(c64_addr+i));
+	      write_byte(c64_addr+i, b);
+	    }
+	    break;
+    case 0x03:
+      Serial.println("verify");
+	    for (uint16_t i=0; i<reu_len; i++) {
+	      if ((verify_error==0) && (reu_read_byte(reu_addr+i) != read_byte(c64_addr+i))) {
+	        verify_error = 1;
+	        verify_pos = i+1; // one past the difference
+          break;
+	      }
+	    }
+	    break;
+  }
+  if ((op==0x03) && verify_error) {
+    reu_len = verify_pos; // this is where verify error happened
+  }
+  // XXX this is wrong, it's 'FIX' during transfer
+  if ((reu_registers[1] & 0x20)==0) {
+    // no autoload
+    switch (reu_registers[0x0a] & 0xc0) {
+      case 0x00: // update both addresses
+  	    reu_addr += reu_len;
+  	    c64_addr += reu_len;
+  	    break;
+      case 0x80: // fix C64 addr, update REU addr
+  	    reu_addr += reu_len;
+  	    break;
+      case 0x40: // fix REU addr, update C64 addr
+  	    c64_addr += reu_len;
+  	    break;
+      case 0xc0: // fix both addresses
+  	    break;
+    }
+  }
+  // reload registers with original or updated addresses
+  // XXX autoload shadow not emulated here
+  reu_registers[2] = c64_addr & 0xff;
+  reu_registers[3] = c64_addr >> 8;
+  reu_registers[4] = reu_addr & 0xff;
+  reu_registers[5] = (reu_addr >> 8) & 0xff;
+  reu_registers[6] = (reu_addr >> 16) & 0xff;
+
+  reu_registers[0] = (reu_registers[0] & 0xcf) | ((1 << 6) | (verify_error << 5)) ; // set bit 6, transfer complete; bit 5 - verify error
+  return;
 }
 
 FASTRUN inline void update_teensy64_setup() {
@@ -452,6 +564,11 @@ FASTRUN inline uint8_t finish_read_byte() {
     if ((current_address >= TEENSY64_REGISTER_BASE) && (current_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
       return teensy64_registers[current_address-TEENSY64_REGISTER_BASE];
     }
+    if (reu_emulation_enabled) {
+      if ((current_address >= REU_REGISTER_BASE) && (current_address <= (REU_REGISTER_BASE+0x100))) {
+        return reu_registers[current_address && 0x001f];
+      }
+    }
   }
 
   if (current_address_mode>0x1) {
@@ -534,6 +651,15 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
        }
        update_teensy64_setup();
        return;
+    }
+    if (reu_emulation_enabled) {
+      if ((local_address >= REU_REGISTER_BASE) && (local_address <= (REU_REGISTER_BASE+0x100))) {
+        reu_registers[local_address & 0x001f] = local_write_data;
+	      if (((local_address & 0x001f)==0x01) && (local_write_data & 0x80)) { // command register with 7th bit set?
+	        reu_execute(local_write_data & 0x03);
+	      }
+        return;
+      }
     }
   }
   // if I/O enabled but we don't write to I/O space
