@@ -296,7 +296,6 @@ void reu_execute(uint8_t op) {
   uint16_t c64_addr = reu_registers[2] + (reu_registers[3] << 8);
   uint32_t reu_addr = reu_registers[4] + (reu_registers[5] << 8) + (reu_registers[6] << 16);
   uint16_t reu_len  = reu_registers[7] + (reu_registers[8] << 8);
-  uint8_t b, c;
   uint8_t verify_error = 0;
   uint16_t verify_pos = 0;
   if (reu_len==0) reu_len = 0x10000; // full 64K
@@ -321,7 +320,7 @@ void reu_execute(uint8_t op) {
     case 0x02:
       Serial.println("swap");
 	    for (uint16_t i=0; i<reu_len; i++) {
-	      b = reu_read_byte(reu_addr+i);
+	      uint8_t b = reu_read_byte(reu_addr+i);
 	      reu_write_byte(reu_addr+i, read_byte(c64_addr+i));
 	      write_byte(c64_addr+i, b);
 	    }
@@ -343,6 +342,7 @@ void reu_execute(uint8_t op) {
   if ((reu_registers[1] & 0x20)==0) {
     // if no autoload then update addresses
     // XXX this is wrong, it's a 'FIX' during transfer, not after
+    // after transfer with no autoload - length register is 1, addresses are one past the last copied byte
     switch (reu_registers[0x0a] & 0xc0) {
       case 0x00: // update both addresses
   	    reu_addr += reu_len;
