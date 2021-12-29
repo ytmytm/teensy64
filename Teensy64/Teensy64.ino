@@ -340,9 +340,9 @@ void reu_execute(uint8_t op) {
   if ((op==0x03) && verify_error) {
     reu_len = verify_pos; // this is where verify error happened
   }
-  // XXX this is wrong, it's 'FIX' during transfer
   if ((reu_registers[1] & 0x20)==0) {
-    // no autoload
+    // if no autoload then update addresses
+    // XXX this is wrong, it's a 'FIX' during transfer, not after
     switch (reu_registers[0x0a] & 0xc0) {
       case 0x00: // update both addresses
   	    reu_addr += reu_len;
