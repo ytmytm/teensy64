@@ -679,9 +679,7 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
   }
   // if I/O enabled but we don't write to I/O space
   // if I/O not enabled always write to RAM
-  // ??? why this doesn't work
-  //if ((!io_enabled) || (io_enabled && ((local_address <= 0xD000) && (local_address >=0xE000)))) { internal_RAM[local_address] = local_write_data; };
-  internal_RAM[local_address] = local_write_data; // XXX writes to RAM under I/O even when I/O enabled
+  if ((!io_enabled) || (io_enabled && ((local_address <= 0xD000) || (local_address >=0xE000)))) { internal_RAM[local_address] = local_write_data; };
 
   // Internal RAM
   //
