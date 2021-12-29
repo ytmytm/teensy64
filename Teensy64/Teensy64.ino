@@ -682,16 +682,19 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
   if ((!io_enabled) || (io_enabled && ((local_address <= 0xD000) || (local_address >=0xE000)))) { internal_RAM[local_address] = local_write_data; };
 
   // Internal RAM
-  //
   if (internal_address_check(local_address)>0x2)  {
     last_access_internal_RAM=1;
   }
   else 
   {
-       //WAS: if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
        if (last_access_internal_RAM==1) {
-         do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
          last_access_internal_RAM=0;
+         if (mode<2) {
+            wait_for_CLK_rising_edge(); // in mode0 always write, no need to wait, other peripherals need to wait until last write cycle to halt CPU
+         } else {
+            // in mode 2 and higher we need to sync again, we can't write while VIC blocks the bus
+            do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
+         }
        }
 
        digitalWriteFast(PIN_RDWR_n,  0x0);
