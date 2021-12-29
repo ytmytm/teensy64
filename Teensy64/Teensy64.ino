@@ -405,13 +405,27 @@ FASTRUN inline uint8_t internal_address_check(uint16_t local_address) {
 
   if (mode==0) return 0; // shortcut for external accesses
 
+  if ((local_address >= 0xD000) && (local_address <= 0xDFFF)) {
+    if (!io_enabled) return mode;
+    // I/O enabled
+    // is this one of intercepted areas?
+    if ((local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
+      return mode;
+    }
+    if (reu_emulation_enabled && ((local_address >= REU_REGISTER_BASE) && (local_address <= (REU_REGISTER_BASE+0x100)))) {
+      return mode;
+    }
+    // real I/O
+    return 0x0;
+  }
+
 //  if ( (local_address > 0x0001 ) && (local_address <= 0x03FF) ) return mode;            //   Zero-Page up to video
   if ( (local_address >= 0x0400) && (local_address <= 0x07FF) && mode>1) return 0x1;    //   C64 Video Memory // can't be 3 on boot
 //  if ( (local_address >= 0x0800) && (local_address <= 0x7FFF) ) return mode;            //   C64 RAM
 //  if ( (local_address >= 0x8000) && (local_address <= 0x9FFF) ) return mode;            //   C64 CART_LOW & RAM
 //  if ( (local_address >= 0xA000) && (local_address <= 0xBFFF) ) return mode;            //   C64 BASIC ROM & RAM
 //  if ( (local_address >= 0xC000) && (local_address <= 0xCFFF) ) return mode;            //   C64 RAM
-  if ( (local_address >= 0xD000) && (local_address <= 0xDFFF) ) return io_enabled ? 0x0 : mode ; //   C64 I/O // if I/O is enabled this must be r/w cycle-exact
+//  if ( (local_address >= 0xD000) && (local_address <= 0xDFFF) ) return io_enabled ? 0x0 : mode ; //   C64 I/O // if I/O is enabled this must be r/w cycle-exact
 //  if ( (local_address >= 0xE000) && (local_address <= 0xE4FF) ) return mode;            //   C64 KERNAL ROM
   if ( (local_address >= 0xE500) && (local_address <= 0xFF7F) && mode>1) return 0x1;    //   C64 KERNAL ROM  // can't be 2 nor 3 on boot, why?
 //  if ( (local_address >= 0xFF80) && (local_address <= 0xFFFF) ) return mode;            //   C64 KERNAL ROM
@@ -530,6 +544,18 @@ FASTRUN inline void start_read(uint32_t local_address) {
 // -------------------------------------------------
 FASTRUN inline uint8_t fetch_byte_from_bank() {
 
+    if (io_enabled) {
+      if ((current_address >= TEENSY64_REGISTER_BASE) && (current_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
+        return teensy64_registers[current_address-TEENSY64_REGISTER_BASE];
+      }
+      if (reu_emulation_enabled) {
+        if ((current_address >= REU_REGISTER_BASE) && (current_address <= (REU_REGISTER_BASE+0x100))) {
+//          if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print("read $"); Serial.print(current_address,HEX); Serial.print(" = "); Serial.println(reu_registers[current_address & 0x001f],HEX); };
+          return reu_registers[current_address & 0x001f]; // 5 address bits connected, shadow every $20 bytes
+        }
+      }
+    }
+
     if ((Page_128_159) && ((EXROM==1 && GAME==0) || (EXROM==0 && ((bank_mode & (HIRAM_BIT|LORAM_BIT))==(HIRAM_BIT|LORAM_BIT))))) {
       return CART_LOW_ROM[current_address & 0x1FFF];
     }
@@ -560,17 +586,6 @@ FASTRUN inline uint8_t fetch_byte_from_bank() {
 // -------------------------------------------------
 FASTRUN inline uint8_t finish_read_byte() {
 
-  if (io_enabled) {
-    if ((current_address >= TEENSY64_REGISTER_BASE) && (current_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
-      return teensy64_registers[current_address-TEENSY64_REGISTER_BASE];
-    }
-    if (reu_emulation_enabled) {
-      if ((current_address >= REU_REGISTER_BASE) && (current_address <= (REU_REGISTER_BASE+0x100))) {
-        return reu_registers[current_address && 0x001f];
-      }
-    }
-  }
-
   if (current_address_mode>0x1) {
     last_access_internal_RAM=1;
     return fetch_byte_from_bank();
@@ -582,7 +597,10 @@ FASTRUN inline uint8_t finish_read_byte() {
   do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
 
   if (current_address==0x1) return read_cpu_port();
+//  if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print(io_enabled); Serial.print("finish_read: before read $"); Serial.print(current_address,HEX); Serial.println(" from direct");};
   if (current_address_mode==0) return direct_datain;
+//  if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print(io_enabled); Serial.print("finish_read: before read $"); Serial.print(current_address,HEX); Serial.println(" from bank");};
+
   return fetch_byte_from_bank();
 
 }
@@ -609,7 +627,9 @@ inline uint8_t read_byte(uint16_t local_address) {
   do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
 
   if (current_address==0x1) return read_cpu_port();
+//  if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print(io_enabled); Serial.print(" read_byte: before read $"); Serial.print(current_address,HEX); Serial.println(" from direct");};
   if (current_address_mode==0) return direct_datain;
+//  if ((current_address==0xdf04) || (current_address==0xdf05)) { Serial.print(io_enabled); Serial.print(" read_byte: before read $"); Serial.print(current_address,HEX); Serial.println(" from bank");};
   return fetch_byte_from_bank();
 
 }
@@ -654,6 +674,7 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
     }
     if (reu_emulation_enabled) {
       if ((local_address >= REU_REGISTER_BASE) && (local_address <= (REU_REGISTER_BASE+0x100))) {
+        //if ((local_address==0xdf04) || (local_address==0xdf05)) { Serial.print("write $"); Serial.print(local_address,HEX); Serial.print(" from "); Serial.print(reu_registers[local_address & 0x001f],HEX); Serial.print(" to "); Serial.print(local_write_data, HEX); };
         reu_registers[local_address & 0x001f] = local_write_data;
 	      if (((local_address & 0x001f)==0x01) && (local_write_data & 0x80)) { // command register with 7th bit set?
 	        reu_execute(local_write_data & 0x03);
