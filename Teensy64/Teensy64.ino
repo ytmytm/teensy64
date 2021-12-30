@@ -181,8 +181,8 @@ uint8_t teensy64_registers[TEENSY64_REGISTER_SIZE];
  *  0x00 - xxxxxxx0 - clear: cycle exact, set: enable speedup mode from register 0x01 (by default mode 1) (for C128 2MHz compatibility)
  *  0x01 - xxxxxx10 - mode number for speedup (1, 2 or 3), no speedup with mode 1
  *  0x02 - xxxxxxx0 - clear: enable mode 0 (external cartridge) and RESET, set: enable mode 1 (internal RAM), no RESET
- *         xxxxxx1x - clear: no REU emulation, set: emulate REU (default: enabled)
- *         xxxxx2xx - clear: no LOAD trap, set: enable LOAD trap (default: enabled)
+ *         xxxxxx1x - clear: no LOAD trap, set: enable LOAD trap (default: enabled)
+ *         xxxxx2xx - clear: no REU emulation, set: emulate REU (default: enabled)
  */
 
 #define REU_REGISTER_BASE 0xdf00
