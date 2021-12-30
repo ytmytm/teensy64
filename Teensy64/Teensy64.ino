@@ -2201,6 +2201,53 @@ void test_sequence() {
   start_read(register_pc);
 }
 
+// --------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------
+
+void monitor_reg() {
+  char buf[35];
+  Serial.println("  ADDR A  X  Y  SP 00 01 NV-BDIZC");
+  sprintf(buf,";%04X %02X %02X %02X %02X %02X %02X ",register_pc,register_a,register_x,register_y,register_sp,internal_RAM[0],internal_RAM[1]);
+  Serial.print(buf);
+  uint8_t f = register_flags;
+  for (uint8_t i=0;i<7;i++) {
+    if (f & 0x80) { Serial.print('1'); } else { Serial.print('0'); };
+    f = f << 1;
+  }
+  Serial.println();
+}
+
+void monitor_mem() {
+  char buf[255];
+  uint8_t i=0;
+  char b='\0';
+  uint16_t addr;
+  static uint16_t lastaddr = 0;
+  while (i<sizeof(buf) && b!='\n') {
+    while(!Serial.available());
+    b = Serial.read();
+    buf[i++] = b;
+  }
+  buf[i] = 0;
+  Serial.print("["); Serial.print(buf); Serial.println("]");
+  if (strlen(buf)==0) {
+    addr = lastaddr;
+  } else {
+    addr = strtol(buf,0,16);
+  }
+  Serial.print("addr=");Serial.println(addr,HEX);
+  for (uint8_t i=0;i<5;i++) {
+    sprintf(buf, "%04X", addr);
+    Serial.print(">"); Serial.print(buf);
+    for (uint8_t j=0;j<16;i++) {
+      sprintf(buf, " %02X", internal_RAM[addr++]);
+      Serial.print(buf);
+    }
+    Serial.println();
+  }
+  lastaddr = addr;
+}
+
 // -------------------------------------------------
 //
 // Main loop
@@ -2244,7 +2291,7 @@ void test_sequence() {
             case '1': mode=1;  Serial.println("M1"); break;
             case '2': mode=2;  Serial.println("M2"); break;
             case '3': mode=3;  Serial.println("M3"); break;
-            case 'r': reset_sequence(); Serial.println("RESET"); break;
+            case 'R': reset_sequence(); Serial.println("RESET"); break;
             case 'e': EXROM=0; reset_sequence(); Serial.println("EXROM=0"); break;
             case 'E': EXROM=1; reset_sequence(); Serial.println("EXROM=1"); break;
             case 'g': GAME=0; reset_sequence(); Serial.println("GAME=0"); break;
@@ -2253,6 +2300,8 @@ void test_sequence() {
             case '?': Serial.print("M"); Serial.print(mode); Serial.print(" EXROM"); Serial.print(EXROM); Serial.print(" GAME"); Serial.println(GAME); 
                 Serial.print("Setup: mode="); Serial.print(mode); Serial.print(" LOAD:"); Serial.print(load_trap_enabled); Serial.print(" REU:"); Serial.println(reu_emulation_enabled);
                 break;
+            case 'm': monitor_mem();
+            case 'r': monitor_reg();
             default: break;
           }
         }
