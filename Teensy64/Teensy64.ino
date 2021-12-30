@@ -186,6 +186,7 @@ uint8_t teensy64_registers[TEENSY64_REGISTER_SIZE];
  *         xxxxx2xx - clear: no REU emulation, set: emulate REU (default: enabled)
  */
 
+// REU emulation based on https://codebase64.org/doku.php?id=base:reu_registers
 #define REU_REGISTER_BASE 0xdf00
 #define REU_REGISTER_SIZE 32 // REU has 5 address lines connected, mirrors every 32 bytes
 uint8_t reu_registers[REU_REGISTER_SIZE] = { 0x10, 0x10, 0, 0, 0, 0, 0xf8, 0xff, 0xff, 0x1f, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
