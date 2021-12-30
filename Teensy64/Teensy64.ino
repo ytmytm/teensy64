@@ -2228,26 +2228,26 @@ void monitor_reg() {
   Serial.println("]");
 }
 
-void monitor_mem() {
+uint16_t monitor_parse_hex() {
+  char b='\0';
   char buf[255];
   uint8_t i=0;
-  char b='\0';
-  uint16_t addr;
-  static uint16_t lastaddr = 0;
   while (i<sizeof(buf) && b!='\n') {
     while(!Serial.available());
     b = Serial.read();
     buf[i++] = b;
   }
   buf[i] = 0;
-  Serial.print("["); Serial.print(buf); Serial.println("]");
   if (buf[0]=='\n') buf[0]='\0'; // trim
-  if (strlen(buf)==0) {
-    addr = lastaddr;
-  } else {
-    addr = strtol(buf,0,16);
-  }
-  Serial.print("addr=");Serial.println(addr,HEX);
+  return strtol(buf,0,16);
+}
+
+void monitor_mem() {
+  char buf[255];
+  uint16_t addr;
+  static uint16_t lastaddr = 0;
+  addr = monitor_parse_hex();
+  if (addr==0) addr = lastaddr;
   for (uint8_t i=0;i<16;i++) {
     sprintf(buf, "%04X", addr);
     Serial.print(">"); Serial.print(buf);
@@ -2258,6 +2258,10 @@ void monitor_mem() {
     Serial.println();
   }
   lastaddr = addr;
+}
+
+void monitor_go() {
+  register_pc = monitor_parse_hex();
 }
 
 // -------------------------------------------------
@@ -2306,14 +2310,15 @@ void monitor_mem() {
             case 'R': reset_sequence(); Serial.println("RESET"); break;
             case 'e': EXROM=0; reset_sequence(); Serial.println("EXROM=0"); break;
             case 'E': EXROM=1; reset_sequence(); Serial.println("EXROM=1"); break;
-            case 'g': GAME=0; reset_sequence(); Serial.println("GAME=0"); break;
-            case 'G': GAME=1; reset_sequence(); Serial.println("GAME=1"); break;
+            //case 'g': GAME=0; reset_sequence(); Serial.println("GAME=0"); break;
+            //case 'G': GAME=1; reset_sequence(); Serial.println("GAME=1"); break;
             case 't': Serial.println("TEST"); test_sequence(); break;
             case '?': Serial.print("M"); Serial.print(mode); Serial.print(" EXROM"); Serial.print(EXROM); Serial.print(" GAME"); Serial.println(GAME); 
                 Serial.print("Setup: mode="); Serial.print(mode); Serial.print(" LOAD:"); Serial.print(load_trap_enabled); Serial.print(" REU:"); Serial.println(reu_emulation_enabled);
                 break;
             case 'm': monitor_mem(); break;
             case 'r': monitor_reg(); break;
+            case 'g': monitor_go(); break;
             default: break;
           }
         }
