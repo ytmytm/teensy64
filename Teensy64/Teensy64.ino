@@ -155,6 +155,7 @@ uint8_t   EXROM=1;
 uint8_t   GAME=1;
 bool      load_trap_enabled=true;
 bool      reu_emulation_enabled=true;
+bool      internal_io_address=false;
 
 uint16_t  register_pc=0;
 uint16_t  current_address=0;
@@ -403,21 +404,24 @@ FASTRUN inline void update_teensy64_setup() {
 // ----------------------------------------------------------
 FASTRUN inline uint8_t internal_address_check(uint16_t local_address) {
 
-  if (mode==0) return 0; // shortcut for external accesses
-
+  internal_io_address = false;
   if ((local_address >= 0xD000) && (local_address <= 0xDFFF)) {
     if (!io_enabled) return mode;
     // I/O enabled
     // is this one of intercepted areas?
     if ((local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
+      internal_io_address = true;
       return mode;
     }
     if (reu_emulation_enabled && ((local_address >= REU_REGISTER_BASE) && (local_address <= (REU_REGISTER_BASE+0x100)))) {
+      internal_io_address = true;
       return mode;
     }
     // real I/O
     return 0x0;
   }
+
+  if (mode==0) return 0; // shortcut for external accesses
 
 //  if ( (local_address > 0x0001 ) && (local_address <= 0x03FF) ) return mode;            //   Zero-Page up to video
   if ( (local_address >= 0x0400) && (local_address <= 0x07FF) && mode>1) return 0x1;    //   C64 Video Memory // can't be 3 on boot
@@ -544,7 +548,7 @@ FASTRUN inline void start_read(uint32_t local_address) {
 // -------------------------------------------------
 FASTRUN inline uint8_t fetch_byte_from_bank() {
 
-    if (io_enabled) {
+    if (internal_io_address) {
       if ((current_address >= TEENSY64_REGISTER_BASE) && (current_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
         return teensy64_registers[current_address-TEENSY64_REGISTER_BASE];
       }
@@ -595,6 +599,8 @@ FASTRUN inline uint8_t finish_read_byte() {
 
   do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
 
+
+  if (internal_io_address) return fetch_byte_from_bank();
   if (current_address==0x1) return read_cpu_port();
   if (current_address_mode==0) return direct_datain;
 
@@ -623,6 +629,7 @@ inline uint8_t read_byte(uint16_t local_address) {
   send_address(local_address);
   do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
 
+  if (internal_io_address) return fetch_byte_from_bank();
   if (current_address==0x1) return read_cpu_port();
   if (current_address_mode==0) return direct_datain;
   return fetch_byte_from_bank();
@@ -657,7 +664,8 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
   // if I/O is enabled and the address is one of the special adresses handle the control value
   if (io_enabled) {
     if ((local_address >= TEENSY64_REGISTER_BASE) && (local_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
-       //Serial.print("R: $"); Serial.print(local_address, HEX), Serial.print(" <- $"); Serial.println(local_write_data, HEX);
+       internal_io_address = true;
+       Serial.print("R: $"); Serial.print(local_address, HEX), Serial.print(" <- $"); Serial.println(local_write_data, HEX);
        switch(local_address) {
          case TEENSY64_REGISTER_BASE+0: teensy64_registers[0x00] = local_write_data & 0x01; break; // 1 bit
          case TEENSY64_REGISTER_BASE+1: teensy64_registers[0x01] = local_write_data & 0x03; break; // 1, 2 or 3, 0 will be filpped to 1
@@ -669,6 +677,7 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
     }
     if (reu_emulation_enabled) {
       if ((local_address >= REU_REGISTER_BASE) && (local_address <= (REU_REGISTER_BASE+0x100))) {
+        internal_io_address = true;
         reu_registers[local_address & 0x001f] = local_write_data;
 	      if (((local_address & 0x001f)==0x01) && (local_write_data & 0x80)) { // command register with 7th bit set?
 	        reu_execute(local_write_data & 0x03);
