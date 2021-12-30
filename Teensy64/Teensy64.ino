@@ -2206,15 +2206,26 @@ void test_sequence() {
 
 void monitor_reg() {
   char buf[35];
-  Serial.println("  ADDR A  X  Y  SP 00 01 NV-BDIZC");
+  Serial.println(" ADDR A  X  Y  SP 00 01 NV-BDIZC");
   sprintf(buf,";%04X %02X %02X %02X %02X %02X %02X ",register_pc,register_a,register_x,register_y,register_sp,internal_RAM[0],internal_RAM[1]);
   Serial.print(buf);
   uint8_t f = register_flags;
-  for (uint8_t i=0;i<7;i++) {
+  for (uint8_t i=0;i<8;i++) {
     if (f & 0x80) { Serial.print('1'); } else { Serial.print('0'); };
     f = f << 1;
   }
   Serial.println();
+  Serial.print("Setup: mode="); Serial.print(mode);
+  Serial.print(" LOAD:"); Serial.print(load_trap_enabled);
+  Serial.print(" REU:"); Serial.print(reu_emulation_enabled);
+  Serial.print(" EXROM"); Serial.print(EXROM);
+  Serial.print(" GAME"); Serial.print(GAME);
+  Serial.println();
+  Serial.print("REU:[");
+  for (uint8_t i=0; i<11; i++) {
+    Serial.print(reu_registers[i], HEX); Serial.print(" ");
+  }
+  Serial.println("]");
 }
 
 void monitor_mem() {
@@ -2230,16 +2241,17 @@ void monitor_mem() {
   }
   buf[i] = 0;
   Serial.print("["); Serial.print(buf); Serial.println("]");
+  if (buf[0]=='\n') buf[0]='\0'; // trim
   if (strlen(buf)==0) {
     addr = lastaddr;
   } else {
     addr = strtol(buf,0,16);
   }
   Serial.print("addr=");Serial.println(addr,HEX);
-  for (uint8_t i=0;i<5;i++) {
+  for (uint8_t i=0;i<16;i++) {
     sprintf(buf, "%04X", addr);
     Serial.print(">"); Serial.print(buf);
-    for (uint8_t j=0;j<16;i++) {
+    for (uint8_t j=0;j<16;j++) {
       sprintf(buf, " %02X", internal_RAM[addr++]);
       Serial.print(buf);
     }
@@ -2300,8 +2312,8 @@ void monitor_mem() {
             case '?': Serial.print("M"); Serial.print(mode); Serial.print(" EXROM"); Serial.print(EXROM); Serial.print(" GAME"); Serial.println(GAME); 
                 Serial.print("Setup: mode="); Serial.print(mode); Serial.print(" LOAD:"); Serial.print(load_trap_enabled); Serial.print(" REU:"); Serial.println(reu_emulation_enabled);
                 break;
-            case 'm': monitor_mem();
-            case 'r': monitor_reg();
+            case 'm': monitor_mem(); break;
+            case 'r': monitor_reg(); break;
             default: break;
           }
         }
