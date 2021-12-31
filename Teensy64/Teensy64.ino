@@ -163,6 +163,7 @@ uint8_t *reu_bank1; // has to be dynamically allocated
 
 #include "sd_card.h"
 // include C64 browser code for SHIFT+RUN/STOP
+// (this header is created by 'make' from sd_browser folder
 #include "sdbrowser.h"
 
 // ------------------------------------------------------------------------------
