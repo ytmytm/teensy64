@@ -2367,12 +2367,10 @@ void monitor_go() {
                loadaddr = basicaddr;
                memcpy(&internal_RAM[basicaddr], &sdbrowser_prg[2], sdbrowser_prg_len-2);
                bytes = sdbrowser_prg_len-2;
-               register_flags=register_flags&0xFE; // CLC
              } else {
                // if name was set load the specified file
                // pass all parameters: A (load/verify), X/Y (loadaddr); setlfs, setnam, whole internalRAM; loadaddr will be updated according to file or unchanged
                bytes = sd_load(filename, internal_RAM, lfn, sa, loadmode, &loadaddr);
-               register_flags=register_flags&0xFE; // CLC
              }
              // update KERNAL pointers
              write_byte(0xac, loadaddr & 0xff, true);
@@ -2395,6 +2393,7 @@ void monitor_go() {
              // set x/y to end address
              register_x = loadaddr & 0xff;
              register_y = loadaddr >> 8;
+             register_flags=register_flags&0xFE; // CLC - no error
              next_instruction = 0x60; // RTS
            }
         }
