@@ -140,11 +140,13 @@ uint8_t   CART_HIGH_ROM[0x2000]; // CART_HIGH_ROM empty
 #define HIRAM_BIT	0x02
 #define LORAM_BIT	0x01
 
+
+#define C128_2MHZ		0xd030
 #define TEENSY64_REGISTER_BASE	0xd0f0
 #define TEENSY64_REGISTER_SIZE	0x03
 
 uint8_t teensy64_registers[TEENSY64_REGISTER_SIZE];
-/* register set at $d030 (53296)
+/* register set at $d030 (53296) / $d0f0 (53488)
  *  0x00 - xxxxxxx0 - clear: cycle exact, set: enable speedup mode from register 0x01 (by default mode 1) (for C128 2MHz compatibility)
  *  0x01 - xxxxxx10 - mode number for speedup (1, 2 or 3), no speedup with mode 1
  *  0x02 - xxxxxxx0 - clear: enable mode 0 (external cartridge) and RESET, set: enable mode 1 (internal RAM), no RESET
@@ -380,6 +382,11 @@ FASTRUN inline uint8_t internal_address_check(uint16_t local_address) {
       internal_io_address = true;
       return mode;
     }
+    // C128_2MHZ mode emulation?
+    if (mode>0 && local_address == C128_2MHZ) {
+      internal_io_address = true;
+      return mode;
+    }
     if (reu_emulation_enabled && ((local_address >= REU_REGISTER_BASE) && (local_address <= (REU_REGISTER_BASE+0x100)))) {
       internal_io_address = true;
       return mode;
@@ -388,8 +395,7 @@ FASTRUN inline uint8_t internal_address_check(uint16_t local_address) {
     return 0x0;
   }
 
-  if (mode==0) return 0; // shortcut for external accesses
-
+//  if (mode==0) return 0; // shortcut for external accesses
 //  if ( (local_address > 0x0001 ) && (local_address <= 0x03FF) ) return mode;            //   Zero-Page up to video
 //  if ( (local_address >= 0x0400) && (local_address <= 0x07FF) && mode>1) return 0x1;    //   C64 Video Memory // can't be 3 on boot
 //  if ( (local_address >= 0x0800) && (local_address <= 0x7FFF) ) return mode;            //   C64 RAM
@@ -519,6 +525,9 @@ FASTRUN inline uint8_t fetch_byte_from_bank() {
       if ((current_address >= TEENSY64_REGISTER_BASE) && (current_address < (TEENSY64_REGISTER_BASE+TEENSY64_REGISTER_SIZE))) {
         return teensy64_registers[current_address-TEENSY64_REGISTER_BASE];
       }
+      if (current_address == C128_2MHZ) {
+	return teensy64_registers[0];
+      }
       if (reu_emulation_enabled) {
         if ((current_address >= REU_REGISTER_BASE) && (current_address <= (REU_REGISTER_BASE+0x100))) {
           return reu_registers[current_address & 0x001f]; // 5 address bits connected, shadow every $20 bytes
@@ -639,6 +648,12 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
          case TEENSY64_REGISTER_BASE+2: teensy64_registers[0x02] = local_write_data & 0x07; break; // 3 bits
          default: break;
        }
+       update_teensy64_setup();
+       return;
+    }
+    if (local_address == C128_2MHZ) {
+       internal_io_address = true;
+       teensy64_registers[0x00] = local_write_data & 0x01;
        update_teensy64_setup();
        return;
     }
