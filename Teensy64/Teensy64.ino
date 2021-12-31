@@ -118,17 +118,16 @@ uint8_t   last_access_internal_RAM=0;
 uint8_t   current_p=0x7;
 uint8_t   bank_mode=0x1f;
 uint16_t  effective_address=0;
-// configuration variabels & cached values
-uint8_t   mode=1;
-uint8_t   current_address_mode=1;
-uint8_t   io_enabled=1;
+uint16_t  current_address=0;
+// configuration variables & cached values
+uint8_t   mode=1; // target speed mode
+uint8_t   current_address_mode=1; // speed mode relevant for current address (taking mode 0 and i/o into account)
+uint8_t   io_enabled=1; // is I/O enabled, updated after every write to $01
 uint8_t   EXROM=1;
 uint8_t   GAME=1;
 bool      load_trap_enabled=true;
 bool      reu_emulation_enabled=true;
-bool      internal_io_address=false;
-
-uint16_t  current_address=0;
+bool      internal_io_address=false; // is current address I/O but handled internaly (REU and Teensy64 config)?
 
 // RAM
 uint8_t   internal_RAM[65536];
