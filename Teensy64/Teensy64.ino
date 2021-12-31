@@ -537,7 +537,7 @@ FASTRUN inline uint8_t fetch_byte_from_bank() {
         return teensy64_registers[current_address-TEENSY64_REGISTER_BASE];
       }
       if (current_address == C128_2MHZ) {
-	return teensy64_registers[0];
+        return teensy64_registers[0];
       }
       if (reu_emulation_enabled) {
         if ((current_address >= REU_REGISTER_BASE) && (current_address <= (REU_REGISTER_BASE+0x100))) {
@@ -663,6 +663,7 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
        return;
     }
     if (local_address == C128_2MHZ) {
+       Serial.print("R: $"); Serial.print(local_address, HEX), Serial.print(" <- $"); Serial.println(local_write_data, HEX);
        internal_io_address = true;
        teensy64_registers[0x00] = local_write_data & 0x01;
        update_teensy64_setup();
