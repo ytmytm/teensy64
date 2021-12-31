@@ -1,5 +1,5 @@
 
-// Arduino IDE settings: Teensy 4.1, Serial, 600MHz, Faster
+// Arduino IDE settings: Teensy 4.1, Serial, 816MHz, Fastest
 
 //------------------------------------------------------------------------
 //
@@ -99,23 +99,28 @@
 
 // CPU register for direct reads of the GPIOs
 //
+uint16_t  register_pc=0;
 uint8_t   register_flags=0x34; 
 uint8_t   register_a=0;
 uint8_t   register_x=0;
 uint8_t   register_y=0;
 uint8_t   register_sp=0xFF;
+// bus status
 uint8_t   direct_datain=0;
 uint8_t   direct_reset=0;
 uint8_t   direct_ready_n=0;
 uint8_t   direct_irq=0;
 uint8_t   direct_nmi=0;
+// 6502 core variables
 uint8_t   global_temp=0;
-uint8_t   last_access_internal_RAM=0;
 uint8_t   ea_data=0;
-uint8_t   mode=1;
-uint8_t   current_address_mode=1;
+uint8_t   last_access_internal_RAM=0;
 uint8_t   current_p=0x7;
 uint8_t   bank_mode=0x1f;
+uint16_t  effective_address=0;
+// configuration variabels & cached values
+uint8_t   mode=1;
+uint8_t   current_address_mode=1;
 uint8_t   io_enabled=1;
 uint8_t   EXROM=1;
 uint8_t   GAME=1;
@@ -123,14 +128,15 @@ bool      load_trap_enabled=true;
 bool      reu_emulation_enabled=true;
 bool      internal_io_address=false;
 
-uint16_t  register_pc=0;
 uint16_t  current_address=0;
-uint16_t  effective_address=0;
 
+// RAM
 uint8_t   internal_RAM[65536];
+// ROM
 #include "rom_basic.h"
 #include "rom_kernal.h"
 
+// CART ROM
 // include 8k diagnostics cartridge from http://www.zimmers.net/anonftp/pub/cbm/schematics/cartridges/c64/diag/index.html
 // send 'e' to set EXROM to 0, send 'E' to disable cart (EXROM=1)
 #include "diag-c64-8k.h" // CART_LOW_ROM at $8000
@@ -140,11 +146,9 @@ uint8_t   CART_HIGH_ROM[0x2000]; // CART_HIGH_ROM empty
 #define HIRAM_BIT	0x02
 #define LORAM_BIT	0x01
 
-
 #define C128_2MHZ		0xd030
 #define TEENSY64_REGISTER_BASE	0xd0f0
 #define TEENSY64_REGISTER_SIZE	0x03
-
 uint8_t teensy64_registers[TEENSY64_REGISTER_SIZE];
 /* register set at $d030 (53296) / $d0f0 (53488)
  *  0x00 - xxxxxxx0 - clear: cycle exact, set: enable speedup mode from register 0x01 (by default mode 1) (for C128 2MHz compatibility)
@@ -161,6 +165,7 @@ uint8_t reu_registers[REU_REGISTER_SIZE] = { 0x10, 0x10, 0, 0, 0, 0, 0xf8, 0xff,
 uint8_t reu_bank0[65536*4]; // 256K because we run out of RAM in Teensy RAM0
 uint8_t *reu_bank1; // has to be dynamically allocated
 
+// SD card / Tapecart-like access
 #include "sd_card.h"
 // include C64 browser code for SHIFT+RUN/STOP
 // (this header is created by 'make' from sd_browser folder
