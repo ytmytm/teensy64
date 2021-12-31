@@ -2170,7 +2170,7 @@ void handle_JAM() {
   Serial.print("JAM! at $"); Serial.println(register_pc, HEX);
 
   // wait for RESET to assert and return control to the loop
-  while (digitalReadFast(PIN_RESET)==0) {}                        // Stay here until RESET asserts
+  // while (digitalReadFast(PIN_RESET)==0) {}                        // Stay here until RESET asserts
 }
 
 // --------------------------------------------------------------------------------------------------
