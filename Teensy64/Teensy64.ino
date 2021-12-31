@@ -174,6 +174,11 @@ uint8_t *reu_bank1; // has to be dynamically allocated
 // ------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------
 
+inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool sync_needed = false);
+
+// ------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
+
 // Setup Teensy 4.1 IO's
 //
 void setup() {
@@ -290,7 +295,7 @@ void reu_execute(uint8_t op) {
     case 0x01:
       Serial.println("REU->C64");
 	    for (uint16_t i=0; i<reu_len; i++) {
-	      write_byte(c64_addr+i, reu_read_byte(reu_addr+i));
+	      write_byte(c64_addr+i, reu_read_byte(reu_addr+i), true);
 	    }
 	    break;
     case 0x02:
@@ -298,7 +303,7 @@ void reu_execute(uint8_t op) {
 	    for (uint16_t i=0; i<reu_len; i++) {
 	      uint8_t b = reu_read_byte(reu_addr+i);
 	      reu_write_byte(reu_addr+i, read_byte(c64_addr+i));
-	      write_byte(c64_addr+i, b);
+	      write_byte(c64_addr+i, b, true);
 	    }
 	    break;
     case 0x03:
@@ -640,7 +645,7 @@ FASTRUN inline uint8_t read_cpu_port() {
 // -------------------------------------------------
 // Full write cycle with address and data written
 // -------------------------------------------------
-inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
+inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool sync_needed = false) {
 
   // Teensy64 Control Registers, don't pass them to outside bus
   // if I/O is enabled and the address is one of the special adresses handle the control value
@@ -686,10 +691,10 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data) {
   {
        if (last_access_internal_RAM==1) {
          last_access_internal_RAM=0;
-         if (mode<2) {
+         if ((mode<2) && !sync_needed) {
             wait_for_CLK_rising_edge(); // in mode0 always write, no need to wait, other peripherals need to wait until last write cycle to halt CPU
          } else {
-            // in mode 2 and higher we need to sync again, we can't write while VIC blocks the bus
+            // in mode 2 and higher (or mode 1 with sync required) we need to sync again, we can't write while VIC blocks the bus
             do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
          }
        }
@@ -2173,7 +2178,7 @@ void handle_JAM() {
 void test_sequence() {
   uint8_t tmp_mode;
   tmp_mode = mode;
-  mode = 1;
+  mode = 2;
   for (uint8_t i=0;i<255;i++) {
     write_byte(0x400+i,i);
   }
@@ -2369,18 +2374,18 @@ void monitor_go() {
                register_flags=register_flags&0xFE; // CLC
              }
              // update KERNAL pointers
-             write_byte(0xac, loadaddr & 0xff);
-             write_byte(0xad, loadaddr << 8);
+             write_byte(0xac, loadaddr & 0xff, true);
+             write_byte(0xad, loadaddr << 8, true);
              if (loadaddr!=basicaddr) {
-              write_byte(0xaa, loadaddr & 0xff);  // update calladdr for sd_browser
-              write_byte(0xab, loadaddr << 8);
+              write_byte(0xaa, loadaddr & 0xff, true);  // update calladdr for sd_browser
+              write_byte(0xab, loadaddr << 8, true);
              }
              // data is only in internal_RAM, writeback to host RAM if needed
              if (mode<3) {
               uint8_t tmp = read_cpu_port();
               write_cpu_port(0x00); // 64K RAM
               for (size_t i=0; i<bytes; i++, loadaddr++) {
-                write_byte(loadaddr, internal_RAM[loadaddr]);
+                write_byte(loadaddr, internal_RAM[loadaddr], true);
               }
               write_cpu_port(tmp); // restore config
              } else {
