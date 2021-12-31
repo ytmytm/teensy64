@@ -31,7 +31,7 @@ Configuration registers are located at $d0f0. The first register is mirrored at 
 |$d0f1:10 | mode number when speedup is enabled: 1, 2 or 3 |
 |$d0f2:0  | clear: enable mode 0 and trigger RESET, set: enable speedup modes |
 |$d0f2:1  | set: enable LOAD ($ffd5) trap for tape device for Tapecart emulation |
-|$d0f2:2  | set: enable REU emulation at $df00-$dfxx |
+|$d0f2:2  | set: enable 512K REU emulation at $df00-$dfxx |
 
 ## Modes:
 
@@ -50,14 +50,16 @@ In mode 3 no data is written to onboard RAM. This means you can't update screen 
 
 *Note: this is not final, mode 0.5 could be useful too for $d030 speedup: with CPU optimizations but having all accesses going through the external bus*
 
-## Examples
+## Configuration examples
 
-For full C64 compatibility set $d0f2 to 0. This will set mode 0 and turn off all speedups. Writes to $d030 (C128 2MHz mode) will be passed to VIC.
+For full C64 compatibility set $d0f2 to 0. This will set mode 0, turn off all speedups, REU and LOAD trap. Writes to $d030 (C128 2MHz mode) will be passed to VIC.
 
-For C128-in-C64-mode like experience the default configuration is to set $d0f2 to $01 (enable speeups) and $d0f1 to $02 (mode 2) or $03 (mode 3).
-As long as $d030/$d0f0 bit 0 is clear the CPU will remain in mode 1 and switch to faster mode (2 or 3) only then C128 2MHz mode is enabled in $d030.
+For C128-in-C64-mode like experience the default configuration is to set $d0f2 to $01 (enable speedups, no REU nor LOAD trap) and $d0f1 to $02 (mode 2) or $03 (mode 3).
+The fast mode from $d0f1 (1, 2 or 3) will be enabled only when C128 2MHz mode is set in $d030.
 
-## Example: raster splits
+As long as $d030/$d0f0 bit 0 is clear the CPU will remain in mode 1.
+
+## Code example
 
 Consider this simple example for speed test:
 
@@ -67,9 +69,9 @@ loop:
     JMP loop
 ```
 
-In the fastest modes 2 and 3 this will change the border colour every **two** cycles. `INC` means two cycles: one fetch from I/O and one store to I/O. 
+Even in the fastest modes 2 and 3 this would change the border colour every **two** cycles. This is because `INC` does one fetch from I/O and one store to I/O. 
 
-This code:
+However this code:
 ```
 loop:
     STX $d020
@@ -77,7 +79,7 @@ loop:
     JMP loop
 ````
 
-will change the border colour on every single cycle. There is only one I/O store in the loop.
+will change the border colour on every single cycle. There is only one I/O access in the loop.
 
 # Compatibility
 
