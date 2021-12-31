@@ -1,40 +1,6 @@
 
-// IDE settings: Teensy 4.1, Serial, 600MHz, Faster
+// Arduino IDE settings: Teensy 4.1, Serial, 600MHz, Faster
 
-//
-//
-//  File Name   :  MCL64.c
-//  Used on     :  
-//  Author      :  Ted Fried, MicroCore Labs
-//  Creation    :  3/12/2021
-//
-//   Description:
-//   ============
-//   
-//  MOS 6510 emulator with bus interface.
-//
-// The acceleration modes can be changed via the UART from the host.
-// Entering a 0,1,2,3 will change the acceleration mode to this value
-// and it will be echoed back to the host.
-//
-// Entering mode 2 or 4 could result in video corruption, but the CPU will still 
-// be running.  When returning to mode-0 or mode-1 the video should return to normal.
-//
-//------------------------------------------------------------------------
-//
-// Modification History:
-// =====================
-//
-// Revision 1 3/12/2021
-// Initial revision
-//
-// Revision 2 11/28/2021
-// Improved undocumented opcodes
-//
-// Revision 3 12/10/2021
-// Made optimiations for acceleration and UART control
-//
-//
 //------------------------------------------------------------------------
 //
 // Copyright (c) 2021 Ted Fried
