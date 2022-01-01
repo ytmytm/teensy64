@@ -159,6 +159,11 @@ When the CPU and its view of memory model are completely under software control 
     - C128 ROM set, internal/external function ROMs
     - MMU emulation - bank switching and memory splits, page 0/1 relocation 
     - fast Z80 core
+ - RAM expansions (limited by Teensy64 RAM, without extra chip - at most 512K)
+    - REU
+    - +60K / +256K
+    - GeoRAM (up to ~512K)
+    - RamCart 64/128K
  - KERNAL ROM traps
     - redirect LOAD from tape, like [Tapecart](https://github.com/KimJorgensen/tapecart) so SHIFT+RUN/STOP instantly loads SD card file browser
     - speedup memory transfer routines (screen scroll?)
