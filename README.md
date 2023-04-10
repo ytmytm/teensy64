@@ -172,7 +172,8 @@ When the CPU and its view of memory model are completely under software control 
  - 8/16k cartridges with banks, their ROMs stored with in firmware flash or loaded from SD card
  - freezer cartridge emulation
  - diagnostics
-    - diagnostic cartridge
+    - built-in diagnostic cartridge
+    - trap JAM opcode and redirect to built-in machine code monitor
     - hardware testing mode [MCL64_Tester](https://github.com/MicroCoreLabs/Projects/tree/master/MCL64_Tester)
  - remote debugging
     - remote machine code monitor over USB serial port or Ethernet (example done) (like VICE)
@@ -185,12 +186,12 @@ When the CPU and its view of memory model are completely under software control 
 
 - redesign the PCB to make SD card stick out of the back of C64 case
 - handle the missing 3 CPU port bits, they need to be bidirectional
-- optional 8500 pinout for C128 board version
-- keep the original 6510 on the adapter board (with gated /RDY signal?) and allow it to take over, for 100% compatibility with stock C64
+- optional 8502 pinout for C128 board version
+- keep the original 6510 on the adapter board too (with gated /RDY signal?) and allow it to take over from Teensy64, for 100% compatibility with stock C64
 
 # Problems
 
-The bus code doesn't use any hardware Teensy interrupts, only 
+The bus code doesn't use any hardware Teensy interrupts to track clock signals, it's all busy wait loops. Any serial/ethernet code will make CPU core lose cycles.
 
 # Status
 
