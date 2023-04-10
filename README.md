@@ -3,16 +3,15 @@
 
 This is a hardware MOS 6510 emulator with some additional features. It can be used as a drop-in replacement on any Commodore 64.
 
-<img src="media/teensy-as-6510.jpg" alt="Teensy64 module installed in C64" width=640>
-<img src="media/mode3.jpg" alt="Mode 2" width=640>
+<img src="media/teensy-as-6510.jpg" alt="Teensy64 module installed in C64" width="320">
 
 ## Credits
 
 The idea, circuit, 6510 bus interface and CPU emulator code: Ted Fried, [Micro Core Labs](https://github.com/MicroCoreLabs/Projects) (master branch)
 
-Additional features: Maciej 'YTM/Elysium' Witkowiak (ytm-devel branch)
+Additional features: Maciej 'YTM/Elysium' Witkowiak
 
-*This is not a repository fork because MCL projects are in a single repository and I can't clone just one of the folders from there. Be sure you visit the blog at [https://microcorelabs.wordpress.com](https://microcorelabs.wordpress.com).*
+*Note: This is not a proper repository fork because MCL's projects are in a single repository and I can't clone just one of the folders from there. Be sure you visit the blog at [https://microcorelabs.wordpress.com](https://microcorelabs.wordpress.com).*
 
 # Hardware
 
@@ -214,7 +213,7 @@ Only lower 3 bits of CPU port at $01 are connected. The remaining three pins use
 If LOAD trap is enabled ($d0f2 bit 1 set) the LOAD from device 1 (tape) with no name will be intercepted and SD card file browser will be loaded.
 This works just like Tapecart. You can browse through files and folders and instantly load & run any PRG file.
 
-# Software possibilities
+# Software ideas
 
 When the CPU and its view of memory model are completely under software control there are some new unique features possible:
 
@@ -227,6 +226,7 @@ When the CPU and its view of memory model are completely under software control 
     - 8086
     - 68000
  - fast and reliable CP/M on C64
+ - SCPU compatibility
  - C128 mode on C64
     - 128/256K RAM
     - C128 ROM set, internal/external function ROMs
@@ -262,10 +262,11 @@ When the CPU and its view of memory model are completely under software control 
 - optional 8502 pinout for C128 board version
 - keep the original 6510 on the adapter board too (with gated /RDY signal?) and allow it to take over from Teensy64, for 100% compatibility with stock C64
 
-# Problems
+# Firmware problems
 
-The bus code doesn't use any hardware Teensy interrupts to track clock signals, it's all busy wait loops. Any serial/ethernet code will make CPU core lose cycles.
+The bus code doesn't use any of the hardware Teensy interrupts to track clock signals, it's all in busy wait loops. Any serial/ethernet code will make CPU core lose cycles.
 
 # Status
 
-The project is very early in the development. This code is more an exploration of what is possible rather than consistently designed feature set.
+The project works as expected if all you need is a 6510 replacement, but additional features are in a very early stage of development.
+This code is more an exploration of what is possible rather than a consistently designed feature set.
