@@ -3,6 +3,9 @@
 
 This is a hardware MOS 6510 emulator with some additional features. It can be used as a drop-in replacement on any Commodore 64.
 
+<img src="media/teensy-as-6510.jpg" alt="Teensy64 module installed in C64" width=640>
+<img src="media/mode3.jpg" alt="Mode 2" width=640>
+
 ## Credits
 
 The idea, circuit, 6510 bus interface and CPU emulator code: Ted Fried, [Micro Core Labs](https://github.com/MicroCoreLabs/Projects) (master branch)
