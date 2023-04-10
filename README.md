@@ -27,7 +27,7 @@ Configuration registers are located at $d0f0. The first register is mirrored at 
 
 |register:bits| description |
 |--|--|
-|$d030:0, $d0f0:0|when bit 0 is set and $d0f2:0 bit is set, then set speed to value from $d0f1, it operates much like C128 2MHz mode 
+|$d030:0, $d0f0:0|when bit 0 is set and $d0f2:0 bit is set, then set speed to value from $d0f1, it operates much like C128 2MHz mode, but faster
 |$d0f1:10 | mode number when speedup is enabled: 1, 2 or 3 |
 |$d0f2:0  | clear: enable mode 0 and trigger RESET, set: enable speedup modes |
 |$d0f2:1  | set: enable LOAD ($ffd5) trap for tape device for Tapecart emulation |
@@ -35,7 +35,7 @@ Configuration registers are located at $d0f0. The first register is mirrored at 
 
 ## Modes:
 
-| | |
+| mode | description |
 |--|--|
 | 0 | cycle exact, all accesses using external bus |
 | 1 | cycle-exact, RAM is read from internal cache, all writes go through external bus |
@@ -52,18 +52,42 @@ In mode 3 no data is written to onboard RAM. This means you can't update screen 
 
 ## Configuration examples
 
-For full C64 compatibility set $d0f2 to 0. This will set mode 0, turn off all speedups, REU and LOAD trap. Writes to $d030 (C128 2MHz mode) will be passed to VIC.
+For full C64 compatibility set $d0f2 to 0. This will set mode 0 - enable full external cartridge compatibility (Action Replay), turn off all speedups, REU and LOAD trap.
+Writes to $d030 (C128 2MHz mode emulation) will be passed to VIC.
+
+```
+POKE 53490,0
+```
 
 For C128-in-C64-mode like experience the default configuration is to set $d0f2 to $01 (enable speedups, no REU nor LOAD trap) and $d0f1 to $02 (mode 2) or $03 (mode 3).
 The fast mode from $d0f1 (1, 2 or 3) will be enabled only when C128 2MHz mode is set in $d030.
 
-As long as $d030/$d0f0 bit 0 is clear the CPU will remain in mode 1.
+```
+REM SETUP
+POKE 53490,1 : REM ENABLE SPEEDUPS
+POKE 53489,3 : REM MAXIMUM SPEED WHEN $D030 IS SET TO 1
+
+REM FAST
+POKE 53296,1
+
+REM SLOW
+POKE 53296,0
+```
+
+As long as $d030/$d0f0 bit 0 is clear the CPU will remain in mode 1, so cartridge like Action Replay will not be visible to the CPU.
 
 ## Code example
 
 Consider this simple example for speed test:
 
 ```
+    SEI
+    LDA #$01 ; enable speedups
+    STA $d0f2
+    LDA #$02 ; mode 2 in fast mode
+    STA $d0f1
+    LDA #$01 ; enable fast code like on C128
+    STA $d030
 loop:
     INC $d020
     JMP loop
@@ -80,6 +104,52 @@ loop:
 ````
 
 will change the border colour on every single cycle. There is only one I/O access in the loop.
+
+These are screen captures from a real machine:
+
+### Modes 0 and 1
+
+Modes 0 and 1 look identical to stock C64:
+<img src="media/mode1.jpg" alt="Modes 0 and 1" width=720>
+
+The main difference between modes 0 and 1 is the bus access - in mode 1 Teensy can replace ROMs and provide virtual cartridge.
+
+### Modes 2 and 3
+
+Mode 2:
+
+<img src="media/mode2.jpg" alt="Mode 2" width=720>
+
+Mode 3:
+
+<img src="media/mode3.jpg" alt="Mode 3" width=720>
+
+There is no difference here because all the writes in the loop are going to I/O space ($d020) with no additional delay. 
+
+We can see the difference is some extra RAM access is introduced. Let's write to I/O but also INC two values from RAM. INC means two bus accesses - one to read value and another one to write it.
+
+Mode 2 with RAM access:
+
+<img src="media/mode2delay.jpg" alt="Mode 2 with RAM access" width=720>
+
+Mode 3 with RAM access:
+
+<img src="media/mode3delay.jpg" alt="Mode 3 with RAM access" width=720>
+
+For completeness, in modes 0, 1 the result looks like this:
+
+<img src="media/mode1delay.jpg" alt="Mode 3 with RAM access" width=720>
+
+# Default configuration
+
+* Note: this is not final *
+
+Right now Teensy starts with USB serial console enabled in mode 1 with REU and LOAD traps enabled. Press SHIFT+RUN/STOP to load SD card browser.
+
+If your attached cartridge doesn't work (like Action Replay) this is because without reading from C64 bus it's invisible to Teensy CPU. Disable speedups and reset the machine:
+```
+POKE 53490,0
+```
 
 # Compatibility
 
