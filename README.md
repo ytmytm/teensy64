@@ -128,7 +128,7 @@ Mode 3:
 
 There is no difference here because all the writes in the loop are going to I/O space ($d020) with no additional delay. 
 
-We can see the difference is some extra RAM access is introduced. Let's write to I/O but also INC two values from RAM. INC means two bus accesses - one to read value and another one to write it.
+We can see the difference if some extra RAM access is introduced. Let's write to I/O but also INC two values from RAM. INC means two bus accesses - one to read value and another one to write it.
 
 Mode 2 with RAM access:
 
@@ -137,6 +137,8 @@ Mode 2 with RAM access:
 Mode 3 with RAM access:
 
 <img src="media/mode3delay.jpg" alt="Mode 3 with RAM access" width=720>
+
+Note that bytes in top-left corner ($0400/$0401) are unchanged - Teensy doesn't access C64 bus on writes, so they are being changed only in Teensy RAM. These changes are not passed through to C64 onboard RAM and so remain invisible to VIC.
 
 For completeness, in modes 0, 1 the result looks like this:
 
