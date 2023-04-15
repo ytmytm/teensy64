@@ -106,11 +106,11 @@ uint8_t   register_x=0;
 uint8_t   register_y=0;
 uint8_t   register_sp=0xFF;
 // bus status
-uint8_t   direct_datain=0;
-uint8_t   direct_reset=0;
-uint8_t   direct_ready_n=0;
-uint8_t   direct_irq=0;
-uint8_t   direct_nmi=0;
+volatile uint8_t direct_datain=0;
+volatile uint8_t direct_reset=0;
+volatile uint8_t direct_ready_n=0;
+volatile uint8_t direct_irq=0;
+volatile uint8_t direct_nmi=0;
 // 6502 core variables
 uint8_t   global_temp=0;
 uint8_t   ea_data=0;
@@ -135,6 +135,9 @@ volatile uint32_t clk_count = 0;
 volatile uint32_t clk_falling = 0;
 volatile uint32_t clk_rising = 0;
 volatile bool write_mode = false;
+// direct irq https://forum.pjrc.com/threads/70821-Teensy-4-1-Interrupt-Problem
+volatile uint32_t& portStatusReg = (digitalPinToPortReg(PIN_CLK0))[6]; // precalc status reg and mask
+uint32_t mask = digitalPinToBitMask(PIN_CLK0);
 
 // RAM
 uint8_t   internal_RAM[65536];
@@ -237,7 +240,10 @@ void setup() {
 
   digitalWriteFast(PIN_RDWR_n, 0x1);
   digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );
-  attachInterrupt (digitalPinToInterrupt (PIN_CLK0), isrClk0, CHANGE );
+  attachInterrupt (digitalPinToInterrupt (PIN_CLK0), nullptr, CHANGE );
+  attachInterruptVector(IRQ_GPIO6789,isrClk0); // override Teensyduino handler and invoke the callback directly
+  NVIC_ENABLE_IRQ(IRQ_GPIO6789);
+  NVIC_SET_PRIORITY(IRQ_GPIO6789, 0);  // highest prio, might be good to reduce a bit
 
   // setup registers and state
   teensy64_registers[0x00] = 0x00; // no speedup
@@ -435,6 +441,8 @@ void isrClk0() {
 
   register uint32_t GPIO6_data_r=GPIO6_DR;
 
+  portStatusReg = mask;  // we worked around the Teensyduino handler, so we need to reset the status flag ourself
+
   clk_count++;
   direct_ready_n  = (GPIO6_data_r&0x40000000) >> 30;  // Teensy 4.1 Pin-26  GPIO6_DR[30]     READY
 
@@ -442,56 +450,50 @@ void isrClk0() {
    // it was falling edge of clk (now it's low, so true clock is high, CPU in control, WRITE happens here)
    if (direct_ready_n==0) { // if we're not locked out by RDY clock in
      clk_falling++;
+     if (write_mode) {
+        digitalWriteFast(PIN_DATAOUT_OE_n,  0x0 );
+     }
    }
  } else {
    // it was rising edge of clk (now it's high so true clock is low, VIC in control), sample inputs on rising edge of clk
    if (direct_ready_n==0) { // if we're not locked out by RDY clock in
      clk_rising++;
    }
-   // we don't want to stretch the time when we drive the bus
-   if (write_mode) {
-     // disable data bus drivers
-     digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );
-     // restore read mode
-     digitalWriteFast(PIN_RDWR_n,  0x1);
-     write_mode=false;
-   }
+   // we could disable read here but it's probably too soon
  }
  GPIO6_data=GPIO6_data_r;
+ asm volatile("dsb"); // avoid double calls due to possible bus sync issues
 }
 
 // -------------------------------------------------
 // Wait for the CLK1 rising edge and sample signals
 // -------------------------------------------------
 FASTRUN inline void wait_for_CLK_rising_edge() {
-  register uint32_t GPIO6_data=0;
-  register uint32_t GPIO6_data_d1=0;
   uint32_t   d10, d2, d3, d4, d5, d76;
 
-    cli();
-    while (((GPIO6_DR >> 12) & 0x1)!=0) {}            // Teensy 4.1 Pin-24  GPIO6_DR[12]     CLK
-    
-    while (((GPIO6_DR >> 12) & 0x1)==0) {GPIO6_data=GPIO6_DR;}                  // This method is ok for VIC-20 and Apple-II+ non-DRAM ranges 
-    sei();
+    register uint32_t clk = clk_rising;
+    while (clk==clk_rising) { };
 
-    //do {  GPIO6_data_d1=GPIO6_DR;   } while (((GPIO6_data_d1 >> 12) & 0x1)==0);   // This method needed to support Apple-II+ DRAM read data setup time
-    //GPIO6_data=GPIO6_data_d1;
-    
+    if (write_mode) {
+       digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );
+
+       // restore read mode (needed?)
+       digitalWriteFast(PIN_RDWR_n,  0x1);
+       write_mode = false;
+    }
+
     d10             = (GPIO6_data&0x000C0000) >> 18;  // Teensy 4.1 Pin-14  GPIO6_DR[19:18]  D1:D0
     d2              = (GPIO6_data&0x00800000) >> 21;  // Teensy 4.1 Pin-16  GPIO6_DR[23]     D2
     d3              = (GPIO6_data&0x00400000) >> 19;  // Teensy 4.1 Pin-17  GPIO6_DR[22]     D3
     d4              = (GPIO6_data&0x00020000) >> 13;  // Teensy 4.1 Pin-18  GPIO6_DR[17]     D4
     d5              = (GPIO6_data&0x00010000) >> 11;  // Teensy 4.1 Pin-19  GPIO6_DR[16]     D5
     d76             = (GPIO6_data&0x0C000000) >> 20;  // Teensy 4.1 Pin-20  GPIO6_DR[27:26]  D7:D6
-    
+
     direct_irq      = (GPIO6_data&0x00002000) >> 13;  // Teensy 4.1 Pin-25  GPIO6_DR[13]     IRQ
-    direct_ready_n  = (GPIO6_data&0x40000000) >> 30;  // Teensy 4.1 Pin-26  GPIO6_DR[30]     READY
     direct_reset    = (GPIO6_data&0x00100000) >> 20;  // Teensy 4.1 Pin-40  GPIO6_DR[20]     RESET
     direct_nmi      = (GPIO6_data&0x00200000) >> 21;  // Teensy 4.1 Pin-41  GPIO6_DR[21]     NMI
-    
+
     direct_datain = d76 | d5 | d4 | d3 | d2 | d10;
-    
-    return; 
 }
 
 
@@ -500,11 +502,9 @@ FASTRUN inline void wait_for_CLK_rising_edge() {
 // -------------------------------------------------
 FASTRUN inline void wait_for_CLK_falling_edge() {
 
-  cli();
-  while (((GPIO6_DR >> 12) & 0x1)==0) {}   // Teensy 4.1 Pin-24  GPIO6_DR[12]  CLK
-  while (((GPIO6_DR >> 12) & 0x1)!=0) {}
-  sei();
-  return; 
+  register uint32_t clk = clk_falling;
+  while (clk==clk_falling) { };
+
 }
 
 
@@ -740,7 +740,6 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
        digitalWriteFast(PIN_RDWR_n,  0x0);
        send_address(local_address);
 
-       
      // Drive the data bus pins from the Teensy to the bus driver which is inactive
      //
        digitalWriteFast(PIN_DATAOUT0,  (local_write_data & 0x01)    );
@@ -754,14 +753,15 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
        
        // During the second CLK phase, enable the data bus output drivers
        //
+       write_mode = true;
        wait_for_CLK_falling_edge();
-       digitalWriteFast(PIN_DATAOUT_OE_n,  0x0 ); 
-       
+
        wait_for_CLK_rising_edge();
-       digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );   
+//       digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );
 
        // restore read mode (needed?)
-       digitalWriteFast(PIN_RDWR_n,  0x1);
+//       digitalWriteFast(PIN_RDWR_n,  0x1);
+//       write_mode = false;
 
   }
   // handle CPU port write
