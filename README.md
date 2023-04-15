@@ -81,10 +81,9 @@ In mode 3 both reads and writes use internal cache. Only I/O writes go through t
  <p><small>Click for video</small></p>
 </a>
 
-The price for that is while mode 3 is running the screen memory visible for VIC is not updated, but we can see that the program is running and the border colour changes.
-In many applications this doesn't matter or the software can slow down to mode 2 or mode 1 during screen writes.
+While running in mode 3, the screen memory visible to VIC is not updated, but it is possible to see that the program is running and the border color changes. In many applications, this is not a problem, or the software can slow down to mode 2 or mode 1 during screen writes.
 
-There was no extra effort here to update the screen. Before program finished fast mode was turned off so Teensy64 returned to mode 1. The program finished with cursor at the bottom of the screen and after printing `READY` the screen had to be scrolled up. During scroll in mode 1 the reads came from internal cache (updated while mode 3 was active) and writes went through the system bus into mainboard RAM, so became visible for VIC.
+There was no need to update the screen separately in this case. After the program finished, fast mode was turned off, and Teensy64 returned to mode 1. The program ended with the cursor at the bottom of the screen, and after printing `READY`, the screen had to be scrolled up. During the scroll in mode 1, the reads came from the internal cache (which was updated while mode 3 was active), and the writes went through the system bus into the mainboard RAM, thus becoming visible to VIC.
 
 ## Configuration examples
 
