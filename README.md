@@ -52,6 +52,37 @@ In mode 3 no data is written to onboard RAM. This means you can't update screen 
 
 *Note: this is not final, mode 0.5 could be useful too for $d030 speedup: with CPU optimizations but having all accesses going through the external bus*
 
+# Benchmark
+
+## Mode 1
+
+In mode 1 the emulation is cycle exact. This benchmark on stock C64 (PAL) takes 87 seconds.
+
+<a href="https://www.youtube.com/embed/dn2THEtvaW8" target="_blank">
+ <img src="http://img.youtube.com/vi/dn2THEtvaW8/mqdefault.jpg" alt="Mode 1 benchmark" />
+ <p><small>Click for video</small></p>
+</a>
+
+## Mode 2
+
+In mode 2 writes go through to the C64 bus but reads don't wait for system clock. This benchmark takes about 27 seconds (3.6x speedup)
+
+<a href="https://www.youtube.com/embed/1h7f0HlH3ek" target="_blank">
+ <img src="http://img.youtube.com/vi/1h7f0HlH3ek/mqdefault.jpg" alt="Mode 2 benchmark" />
+ <p><small>Click for video</small></p>
+</a>
+
+## Mode 3
+
+In mode 3 both reads and writes use internal cache. Only I/O writes go through the system bus. The CPU run at maximum speed - the benchmark takes about 10 seconds. This is over *40x* speedup, more than SuperCPU.
+
+<a href="https://www.youtube.com/embed/Ob-UH81fgmM" target="_blank">
+ <img src="http://img.youtube.com/vi/Ob-UH81fgmM/mqdefault.jpg" alt="Mode 1 benchmark" />
+ <p><small>Click for video</small></p>
+</a>
+
+The price for that is while mode 3 is running the memory visible for VIC is not visible. In many applications this doesn't matter or one could slow down to mode 2 or mode 1 during screen writes. There was no extra effort here to update the screen. Before program finished fast mode was turned off so Teensy64 returned to mode 1. The program finished with cursor at the bottom of the screen and after printing `READY` the screen had to be scrolled up. During scroll in mode 1 the reads came from internal cache (updated while mode 3 was active) and writes went through the system bus into mainboard RAM, so became visible for VIC.
+
 ## Configuration examples
 
 For full C64 compatibility set $d0f2 to 0. This will set mode 0 - enable full external cartridge compatibility (Action Replay), turn off all speedups, REU and LOAD trap.
