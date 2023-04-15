@@ -129,6 +129,13 @@ bool      load_trap_enabled=true;
 bool      reu_emulation_enabled=true;
 bool      internal_io_address=false; // is current address I/O but handled internaly (REU and Teensy64 config)?
 
+// clock counts
+volatile uint32_t GPIO6_data = 0;
+volatile uint32_t clk_count = 0;
+volatile uint32_t clk_falling = 0;
+volatile uint32_t clk_rising = 0;
+volatile bool write_mode = false;
+
 // RAM
 uint8_t   internal_RAM[65536];
 // ROM
@@ -229,6 +236,8 @@ void setup() {
   pinMode(PIN_DATAOUT_OE_n,  OUTPUT); 
 
   digitalWriteFast(PIN_RDWR_n, 0x1);
+  digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );
+  attachInterrupt (digitalPinToInterrupt (PIN_CLK0), isrClk0, CHANGE );
 
   // setup registers and state
   teensy64_registers[0x00] = 0x00; // no speedup
@@ -421,6 +430,35 @@ FASTRUN inline uint8_t internal_address_check(uint16_t local_address) {
 
 }
 
+// interrupt for CLK change
+void isrClk0() {
+
+  register uint32_t GPIO6_data_r=GPIO6_DR;
+
+  clk_count++;
+  direct_ready_n  = (GPIO6_data_r&0x40000000) >> 30;  // Teensy 4.1 Pin-26  GPIO6_DR[30]     READY
+
+ if (((GPIO6_data_r >> 12) & 0x1)==0) {
+   // it was falling edge of clk (now it's low, so true clock is high, CPU in control, WRITE happens here)
+   if (direct_ready_n==0) { // if we're not locked out by RDY clock in
+     clk_falling++;
+   }
+ } else {
+   // it was rising edge of clk (now it's high so true clock is low, VIC in control), sample inputs on rising edge of clk
+   if (direct_ready_n==0) { // if we're not locked out by RDY clock in
+     clk_rising++;
+   }
+   // we don't want to stretch the time when we drive the bus
+   if (write_mode) {
+     // disable data bus drivers
+     digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );
+     // restore read mode
+     digitalWriteFast(PIN_RDWR_n,  0x1);
+     write_mode=false;
+   }
+ }
+ GPIO6_data=GPIO6_data_r;
+}
 
 // -------------------------------------------------
 // Wait for the CLK1 rising edge and sample signals
@@ -2195,7 +2233,7 @@ void test_sequence() {
 // --------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------
 
-void teensy_status() {
+void emu_status() {
   Serial.println();
   Serial.print("Setup: mode="); Serial.print(mode);
   Serial.print(" LOAD:"); Serial.print(load_trap_enabled);
@@ -2208,6 +2246,23 @@ void teensy_status() {
     Serial.print(reu_registers[i], HEX); Serial.print(" ");
   }
   Serial.println("]");
+
+  Serial.print("Clock count:"); Serial.print(clk_count);
+  Serial.print(" rising:"); Serial.print(clk_rising);
+  Serial.print(" falling:"); Serial.println(clk_falling);
+}
+
+void monitor_reg() {
+  char buf[35];
+  Serial.println(" ADDR A  X  Y  SP 00 01 NV-BDIZC");
+  sprintf(buf,";%04X %02X %02X %02X %02X %02X %02X ",register_pc,register_a,register_x,register_y,register_sp,internal_RAM[0],internal_RAM[1]);
+  Serial.print(buf);
+  uint8_t f = register_flags;
+  for (uint8_t i=0;i<8;i++) {
+    Serial.print( (f & 0x80) ? '1' : '0');
+    f = f << 1;
+  }
+  emu_status();
 }
 
 void monitor_reg() {
@@ -2256,7 +2311,9 @@ void monitor_mem() {
 }
 
 void monitor_go() {
-  register_pc = monitor_parse_hex();
+  uint16_t addr = monitor_parse_hex();
+  Serial.print("jumping to "); Serial.println(addr, HEX);
+  register_pc = addr;
 }
 
 // -------------------------------------------------
@@ -2308,7 +2365,7 @@ void monitor_go() {
             //case 'g': GAME=0; reset_sequence(); Serial.println("GAME=0"); break;
             //case 'G': GAME=1; reset_sequence(); Serial.println("GAME=1"); break;
             case 't': Serial.println("TEST"); test_sequence(); break;
-            case '?': teensy_status(); break;
+            case '?': emu_status(); break;
             case 'm': monitor_mem(); break;
             case 'r': monitor_reg(); break;
             case 'g': monitor_go(); break;
