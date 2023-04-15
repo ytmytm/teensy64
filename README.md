@@ -77,11 +77,14 @@ In mode 2 writes go through to the C64 bus but reads don't wait for system clock
 In mode 3 both reads and writes use internal cache. Only I/O writes go through the system bus. The CPU run at maximum speed - the benchmark takes about 10 seconds. This is over *40x* speedup, more than SuperCPU.
 
 <a href="https://www.youtube.com/embed/Ob-UH81fgmM" target="_blank">
- <img src="http://img.youtube.com/vi/Ob-UH81fgmM/mqdefault.jpg" alt="Mode 1 benchmark" />
+ <img src="http://img.youtube.com/vi/Ob-UH81fgmM/mqdefault.jpg" alt="Mode 3 benchmark" />
  <p><small>Click for video</small></p>
 </a>
 
-The price for that is while mode 3 is running the memory visible for VIC is not visible. In many applications this doesn't matter or one could slow down to mode 2 or mode 1 during screen writes. There was no extra effort here to update the screen. Before program finished fast mode was turned off so Teensy64 returned to mode 1. The program finished with cursor at the bottom of the screen and after printing `READY` the screen had to be scrolled up. During scroll in mode 1 the reads came from internal cache (updated while mode 3 was active) and writes went through the system bus into mainboard RAM, so became visible for VIC.
+The price for that is while mode 3 is running the screen memory visible for VIC is not updated, but we can see that the program is running and the border colour changes.
+In many applications this doesn't matter or the software can slow down to mode 2 or mode 1 during screen writes.
+
+There was no extra effort here to update the screen. Before program finished fast mode was turned off so Teensy64 returned to mode 1. The program finished with cursor at the bottom of the screen and after printing `READY` the screen had to be scrolled up. During scroll in mode 1 the reads came from internal cache (updated while mode 3 was active) and writes went through the system bus into mainboard RAM, so became visible for VIC.
 
 ## Configuration examples
 
