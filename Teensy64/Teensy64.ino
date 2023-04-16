@@ -441,27 +441,28 @@ void isrClk0() {
 
   register uint32_t GPIO6_data_r=GPIO6_DR;
 
-  portStatusReg = mask;  // we worked around the Teensyduino handler, so we need to reset the status flag ourself
-
-  clk_count++;
   direct_ready_n  = (GPIO6_data_r&0x40000000) >> 30;  // Teensy 4.1 Pin-26  GPIO6_DR[30]     READY
 
  if (((GPIO6_data_r >> 12) & 0x1)==0) {
    // it was falling edge of clk (now it's low, so true clock is high, CPU in control, WRITE happens here)
    if (direct_ready_n==0) { // if we're not locked out by RDY clock in
-     clk_falling++;
      if (write_mode) {
         digitalWriteFast(PIN_DATAOUT_OE_n,  0x0 );
      }
+     clk_falling++;
    }
  } else {
-   // it was rising edge of clk (now it's high so true clock is low, VIC in control), sample inputs on rising edge of clk
+   if (write_mode) {
+    digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 ); // disabling RDWR here causes problems
+   }
+  // it was rising edge of clk (now it's high so true clock is low, VIC in control), sample inputs on rising edge of clk
    if (direct_ready_n==0) { // if we're not locked out by RDY clock in
      clk_rising++;
    }
-   // we could disable read here but it's probably too soon
  }
+ portStatusReg = mask;  // we worked around the Teensyduino handler, so we need to reset the status flag ourself
  GPIO6_data=GPIO6_data_r;
+ clk_count++;
  asm volatile("dsb"); // avoid double calls due to possible bus sync issues
 }
 
@@ -473,11 +474,9 @@ FASTRUN inline void wait_for_CLK_rising_edge() {
 
     register uint32_t clk = clk_rising;
     while (clk==clk_rising) { };
-
     if (write_mode) {
-       digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );
-
-       // restore read mode (needed?)
+       digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 ); // again?
+       delayNanoseconds(10);
        digitalWriteFast(PIN_RDWR_n,  0x1);
        write_mode = false;
     }
@@ -757,11 +756,6 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
        wait_for_CLK_falling_edge();
 
        wait_for_CLK_rising_edge();
-//       digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );
-
-       // restore read mode (needed?)
-//       digitalWriteFast(PIN_RDWR_n,  0x1);
-//       write_mode = false;
 
   }
   // handle CPU port write
