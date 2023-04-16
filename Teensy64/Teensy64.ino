@@ -232,7 +232,7 @@ void setup() {
 
   // setup registers and state
   teensy64_registers[0x00] = 0x00; // no speedup
-  teensy64_registers[0x01] = 0x02; // use mode 2 (read from IRAM, write to DRAM, enable CPU speedups) for speedup
+  teensy64_registers[0x01] = 0x03; // use mode 2 (read from IRAM, write to DRAM, enable CPU speedups) for speedup
   teensy64_registers[0x02] = 0x07; // enable mode 1, enable REU emulation, enable LOAD trap
 
   update_teensy64_setup();
