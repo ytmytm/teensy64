@@ -52,6 +52,39 @@ In mode 3 no data is written to onboard RAM. This means you can't update screen 
 
 *Note: this is not final, mode 0.5 could be useful too for $d030 speedup: with CPU optimizations but having all accesses going through the external bus*
 
+# Benchmark
+
+## Mode 1
+
+In mode 1 the emulation is cycle exact. This benchmark on stock C64 (PAL) takes 87 seconds.
+
+<a href="https://www.youtube.com/embed/dn2THEtvaW8" target="_blank">
+ <img src="http://img.youtube.com/vi/dn2THEtvaW8/mqdefault.jpg" alt="Mode 1 benchmark" />
+ <p><small>Click for video</small></p>
+</a>
+
+## Mode 2
+
+In mode 2 writes go through to the C64 bus but reads don't wait for system clock. This benchmark takes about 27 seconds (3.6x speedup)
+
+<a href="https://www.youtube.com/embed/1h7f0HlH3ek" target="_blank">
+ <img src="http://img.youtube.com/vi/1h7f0HlH3ek/mqdefault.jpg" alt="Mode 2 benchmark" />
+ <p><small>Click for video</small></p>
+</a>
+
+## Mode 3
+
+In mode 3 both reads and writes use internal cache. Only I/O writes go through the system bus. The CPU run at maximum speed - the benchmark takes about 10 seconds. This is over *40x* speedup, more than SuperCPU.
+
+<a href="https://www.youtube.com/embed/Ob-UH81fgmM" target="_blank">
+ <img src="http://img.youtube.com/vi/Ob-UH81fgmM/mqdefault.jpg" alt="Mode 3 benchmark" />
+ <p><small>Click for video</small></p>
+</a>
+
+While running in mode 3, the screen memory visible to VIC is not updated, but it is possible to see that the program is running and the border color changes. In many applications, this is not a problem, or the software can slow down to mode 2 or mode 1 during screen writes.
+
+There was no need to update the screen separately in this case. After the program finished, fast mode was turned off, and Teensy64 returned to mode 1. The program ended with the cursor at the bottom of the screen, and after printing `READY`, the screen had to be scrolled up. During the scroll in mode 1, the reads came from the internal cache (which was updated while mode 3 was active), and the writes went through the system bus into the mainboard RAM, thus becoming visible to VIC.
+
 ## Configuration examples
 
 For full C64 compatibility set $d0f2 to 0. This will set mode 0 - enable full external cartridge compatibility (Action Replay), turn off all speedups, REU and LOAD trap.
@@ -128,7 +161,7 @@ Mode 3:
 
 There is no difference here because all the writes in the loop are going to I/O space ($d020) with no additional delay. 
 
-We can see the difference is some extra RAM access is introduced. Let's write to I/O but also INC two values from RAM. INC means two bus accesses - one to read value and another one to write it.
+We can see the difference if some extra RAM access is introduced. Let's write to I/O but also INC two values from RAM. INC means two bus accesses - one to read value and another one to write it.
 
 Mode 2 with RAM access:
 
@@ -137,6 +170,8 @@ Mode 2 with RAM access:
 Mode 3 with RAM access:
 
 <img src="media/mode3delay.jpg" alt="Mode 3 with RAM access" width=720>
+
+Note that bytes in top-left corner ($0400/$0401) are unchanged - Teensy doesn't access C64 bus on writes, so they are being changed only in Teensy RAM. These changes are not passed through to C64 onboard RAM and so remain invisible to VIC.
 
 For completeness, in modes 0, 1 the result looks like this:
 
