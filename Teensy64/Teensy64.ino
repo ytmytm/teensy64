@@ -1,5 +1,5 @@
 
-// Arduino IDE settings: Teensy 4.1, Serial, 816MHz, Fastest
+// Arduino IDE settings: Teensy 4.1, Serial, >=720MHz (816MHz with cooling, 600MHz is not enough), Fastest
 
 //------------------------------------------------------------------------
 //
@@ -28,6 +28,7 @@
 #include <stdint.h>
 
 // Teensy 4.1 pin assignments
+// note: in this version /OE (GPIO3) from Teensy is not used, signal from that pin in Teensy socket it routed from CPU pin 38 (R/W)
 //
 #define PIN_CLK0            24
 #define PIN_READY_n         26
