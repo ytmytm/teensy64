@@ -73,7 +73,7 @@
 #define PIN_DATAOUT5        6 
 #define PIN_DATAOUT6        5 
 #define PIN_DATAOUT7        4 
-#define PIN_DATAOUT_OE_n    3 
+//#define PIN_DATAOUT_OE_n    3 no longer used, Teensy disconnected from the board that pin from the board (GPIO3, pin#4) routed to CPU socket pin 38 (R/W gated by AEC) 
 
 
 // 6502 Flags
@@ -236,10 +236,8 @@ void setup() {
   pinMode(PIN_DATAOUT5,    OUTPUT); 
   pinMode(PIN_DATAOUT6,    OUTPUT); 
   pinMode(PIN_DATAOUT7,    OUTPUT);
-  pinMode(PIN_DATAOUT_OE_n,  OUTPUT); 
 
   digitalWriteFast(PIN_RDWR_n, 0x1);
-  digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );
   attachInterrupt (digitalPinToInterrupt (PIN_CLK0), nullptr, CHANGE );
   attachInterruptVector(IRQ_GPIO6789,isrClk0); // override Teensyduino handler and invoke the callback directly
   NVIC_ENABLE_IRQ(IRQ_GPIO6789);
@@ -447,13 +445,14 @@ void isrClk0() {
    // it was falling edge of clk (now it's low, so true clock is high, CPU in control, WRITE happens here)
    if (direct_ready_n==0) { // if we're not locked out by RDY clock in
      if (write_mode) {
-        digitalWriteFast(PIN_DATAOUT_OE_n,  0x0 );
+       digitalWriteFast(PIN_RDWR_n,  0x0);
      }
      clk_falling++;
    }
  } else {
-   if (write_mode) {
-    digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 ); // disabling RDWR here causes problems
+  if (write_mode) {
+       digitalWriteFast(PIN_RDWR_n,  0x1);
+       write_mode = false;
    }
   // it was rising edge of clk (now it's high so true clock is low, VIC in control), sample inputs on rising edge of clk
    if (direct_ready_n==0) { // if we're not locked out by RDY clock in
@@ -474,12 +473,6 @@ FASTRUN inline void wait_for_CLK_rising_edge() {
 
     register uint32_t clk = clk_rising;
     while (clk==clk_rising) { };
-    if (write_mode) {
-       digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 ); // again?
-       delayNanoseconds(10);
-       digitalWriteFast(PIN_RDWR_n,  0x1);
-       write_mode = false;
-    }
 
     d10             = (GPIO6_data&0x000C0000) >> 18;  // Teensy 4.1 Pin-14  GPIO6_DR[19:18]  D1:D0
     d2              = (GPIO6_data&0x00800000) >> 21;  // Teensy 4.1 Pin-16  GPIO6_DR[23]     D2
@@ -555,7 +548,6 @@ FASTRUN inline void start_read(uint32_t local_address) {
     if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
     last_access_internal_RAM=0;
 
-    digitalWriteFast(PIN_RDWR_n,  0x1);
     send_address(local_address);
   }
   return;
@@ -648,7 +640,6 @@ inline uint8_t read_byte(uint16_t local_address) {
   if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
   last_access_internal_RAM=0;
 
-  digitalWriteFast(PIN_RDWR_n,  0x1);
   send_address(local_address);
   do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
 
@@ -1015,7 +1006,6 @@ void reset_sequence() {
             
                 
     digitalWriteFast(PIN_RDWR_n,  0x1);         
-    digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );  
 
     write_cpu_port(7);
 
