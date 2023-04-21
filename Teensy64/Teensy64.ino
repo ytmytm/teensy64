@@ -546,7 +546,6 @@ FASTRUN inline void start_read(uint32_t local_address) {
   if (current_address_mode>0x1) {
       //last_access_internal_RAM=1;
   } else {
-    if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
     last_access_internal_RAM=0;
 
     send_address(local_address);
@@ -610,11 +609,9 @@ FASTRUN inline uint8_t finish_read_byte() {
     return fetch_byte_from_bank();
   }
 
-  if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
   last_access_internal_RAM=0;
 
-  do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
-
+  wait_for_CLK_rising_edge();
 
   if (internal_io_address) return fetch_byte_from_bank();
   if (current_address==0x1) return read_cpu_port();
@@ -638,11 +635,10 @@ inline uint8_t read_byte(uint16_t local_address) {
     return fetch_byte_from_bank();
   }
 
-  if (last_access_internal_RAM==1) wait_for_CLK_rising_edge();
   last_access_internal_RAM=0;
 
   send_address(local_address);
-  do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
+  wait_for_CLK_rising_edge();
 
   if (internal_io_address) return fetch_byte_from_bank();
   if (current_address==0x1) return read_cpu_port();
