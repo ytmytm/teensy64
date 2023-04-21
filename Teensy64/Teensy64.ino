@@ -726,7 +726,7 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
             // in mode 2 and higher (or mode 1 with sync required) we need to sync again, we can't write while VIC blocks the bus
 //            do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
          }
-         if (!clock_phase_high) wait_for_CLK_rising_edge();
+         wait_for_CLK_rising_edge();
        }
 
        digitalWriteFast(PIN_RDWR_n,  0x0);
