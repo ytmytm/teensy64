@@ -499,8 +499,9 @@ FASTRUN inline void wait_for_CLK_rising_edge() {
 FASTRUN inline void wait_for_CLK_falling_edge() {
 
   register uint32_t clk = clk_falling;
-  while (clk==clk_falling) { };
-
+  if (clock_phase_high) {
+    while (clk==clk_falling) { };
+  }
 }
 
 
