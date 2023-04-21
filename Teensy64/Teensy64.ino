@@ -135,6 +135,7 @@ volatile uint32_t GPIO6_data = 0;
 volatile uint32_t clk_count = 0;
 volatile uint32_t clk_falling = 0;
 volatile uint32_t clk_rising = 0;
+volatile bool clock_phase_high = false;
 volatile bool write_mode = false;
 // direct irq https://forum.pjrc.com/threads/70821-Teensy-4-1-Interrupt-Problem
 volatile uint32_t& portStatusReg = (digitalPinToPortReg(PIN_CLK0))[6]; // precalc status reg and mask
@@ -450,6 +451,7 @@ void isrClk0() {
      }
      clk_falling++;
    }
+   clock_phase_high = false;
  } else {
   if (write_mode) {
        digitalWriteFast(PIN_RDWR_n,  0x1);
@@ -459,6 +461,7 @@ void isrClk0() {
    if (direct_ready_n==0) { // if we're not locked out by RDY clock in
      clk_rising++;
    }
+   clock_phase_high = true;
  }
  portStatusReg = mask;  // we worked around the Teensyduino handler, so we need to reset the status flag ourself
  GPIO6_data=GPIO6_data_r;
@@ -717,11 +720,12 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
        if (last_access_internal_RAM==1) {
          last_access_internal_RAM=0;
          if ((mode<2) && !sync_needed) {
-            wait_for_CLK_rising_edge(); // in mode0 always write, no need to wait, other peripherals need to wait until last write cycle to halt CPU
+//            wait_for_CLK_rising_edge(); // in mode0 always write, no need to wait, other peripherals need to wait until last write cycle to halt CPU
          } else {
             // in mode 2 and higher (or mode 1 with sync required) we need to sync again, we can't write while VIC blocks the bus
-            do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
+//            do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
          }
+         if (!clock_phase_high) wait_for_CLK_rising_edge();
        }
 
        digitalWriteFast(PIN_RDWR_n,  0x0);
