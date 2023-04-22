@@ -454,7 +454,7 @@ void isrClk0() {
    clock_phase_high = false;
  } else {
   if (write_mode) {
-       digitalWriteFast(PIN_RDWR_n,  0x1); // if this is delayed bad things (onboard memory corruption) happen (this is the reason for >=720MHz overclock)
+       digitalWriteFast(PIN_RDWR_n,  0x1); // back to read mode
        write_mode = false;
    }
   // it was rising edge of clk (now it's high so true clock is low, VIC in control), sample inputs on rising edge of clk
