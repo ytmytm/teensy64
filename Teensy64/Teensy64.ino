@@ -764,6 +764,7 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
        // false then Action Replay works but demo is out of sync
        wait_for_CLK_rising_edge(true); // don't stop on RDY, writes always succeed (CPU emulator will have at most 3 writes in a row, outside CPU emulator all write_byte calls are with sync=true)
        // check out wait_for_CLK_rising_edge when ignoreRDY=true - there is extra wait state there (as if this one here was false)
+       // u2+ menu fails any time
 
   }
   // handle CPU port write
