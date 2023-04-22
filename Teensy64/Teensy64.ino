@@ -478,8 +478,9 @@ inline void wait_for_CLK_rising_edge(bool ignoreRDY=false) {
     register uint32_t clk = clk_rising;
     if (ignoreRDY) {
       // write byte wants to wait for rising edge (it's low (true: high) now) without RDY check
-      clk = clk_count;
-      while (clk==clk_count) { };
+      register uint32_t clk2 = clk_count;
+      while (clk2==clk_count) { };
+      while (clk==clk_rising) { }; // this uncommented is equivalent to wait_for_CLK_rising_edge(false) at the end of write_byte but less glitchy - ActionReplay works again but te-te-tech demo is broken (increasing speed also helps with glitching but not with scroll)
     } else {
       // usual, wait until bus is available
       while (clk==clk_rising) { };
@@ -762,6 +763,7 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
        // true then Te-te-te-techtech works correctly: https://csdb.dk/release/?id=118336, but Action Replay fails
        // false then Action Replay works but demo is out of sync
        wait_for_CLK_rising_edge(true); // don't stop on RDY, writes always succeed (CPU emulator will have at most 3 writes in a row, outside CPU emulator all write_byte calls are with sync=true)
+       // check out wait_for_CLK_rising_edge when ignoreRDY=true - there is extra wait state there (as if this one here was false)
 
   }
   // handle CPU port write
