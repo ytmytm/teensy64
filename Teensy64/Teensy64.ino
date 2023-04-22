@@ -445,16 +445,16 @@ void isrClk0() {
 
  if (((GPIO6_data_r >> 12) & 0x1)==0) {
    // it was falling edge of clk (now it's low, so true clock is high, CPU in control, WRITE happens here)
-   if (direct_ready_n==0) { // if we're not locked out by RDY clock in
-     if (write_mode) {
-       digitalWriteFast(PIN_RDWR_n,  0x0);
-     }
-     clk_falling++;
+   if (write_mode) { // write can take at most 1 cycle
+     digitalWriteFast(PIN_RDWR_n,  0x0);
    }
+  if (direct_ready_n==0) { // if we're not locked out by RDY clock in
+     clk_falling++;
+  }
    clock_phase_high = false;
  } else {
   if (write_mode) {
-       digitalWriteFast(PIN_RDWR_n,  0x1);
+       digitalWriteFast(PIN_RDWR_n,  0x1); // if this is delayed bad things (onboard memory corruption) happen (this is the reason for >=720MHz overclock)
        write_mode = false;
    }
   // it was rising edge of clk (now it's high so true clock is low, VIC in control), sample inputs on rising edge of clk
@@ -472,11 +472,18 @@ void isrClk0() {
 // -------------------------------------------------
 // Wait for the CLK1 rising edge and sample signals
 // -------------------------------------------------
-FASTRUN inline void wait_for_CLK_rising_edge() {
+inline void wait_for_CLK_rising_edge(bool ignoreRDY=false) {
   uint32_t   d10, d2, d3, d4, d5, d76;
 
     register uint32_t clk = clk_rising;
-    while (clk==clk_rising) { };
+    if (ignoreRDY) {
+      // write byte wants to wait for rising edge (it's low (true: high) now) without RDY check
+      clk = clk_count;
+      while (clk==clk_count) { };
+    } else {
+      // usual, wait until bus is available
+      while (clk==clk_rising) { };
+    }
 
     d10             = (GPIO6_data&0x000C0000) >> 18;  // Teensy 4.1 Pin-14  GPIO6_DR[19:18]  D1:D0
     d2              = (GPIO6_data&0x00800000) >> 21;  // Teensy 4.1 Pin-16  GPIO6_DR[23]     D2
@@ -496,11 +503,18 @@ FASTRUN inline void wait_for_CLK_rising_edge() {
 // -------------------------------------------------
 // Wait for the CLK1 falling edge 
 // -------------------------------------------------
-FASTRUN inline void wait_for_CLK_falling_edge() {
+FASTRUN inline void wait_for_CLK_falling_edge(bool ignoreRDY=false) {
 
   register uint32_t clk = clk_falling;
   if (clock_phase_high) {
-    while (clk==clk_falling) { };
+    if (ignoreRDY) {
+      // write_byte wants to wait for falling edge no matter the state of RDY line
+      clk = clk_count;
+      while (clk == clk_count) { };
+    } else {
+      // this is never used actually
+      while (clk==clk_falling) { };
+    }
   }
 }
 
@@ -720,16 +734,12 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
   {
        if (last_access_internal_RAM==1) {
          last_access_internal_RAM=0;
-         if ((mode<2) && !sync_needed) {
-//            wait_for_CLK_rising_edge(); // in mode0 always write, no need to wait, other peripherals need to wait until last write cycle to halt CPU
-         } else {
-            // in mode 2 and higher (or mode 1 with sync required) we need to sync again, we can't write while VIC blocks the bus
-//            do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active
+         if (clock_phase_high) { // wait for next rising edge for sync, but stop on RDY to sync
+           wait_for_CLK_rising_edge();
          }
-         wait_for_CLK_rising_edge();
        }
 
-       digitalWriteFast(PIN_RDWR_n,  0x0);
+       digitalWriteFast(PIN_RDWR_n,  0x0); // if this is removed the cursor doesn't blick anymore after reset
        send_address(local_address);
 
      // Drive the data bus pins from the Teensy to the bus driver which is inactive
@@ -746,9 +756,12 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
        // During the second CLK phase, enable the data bus output drivers
        //
        write_mode = true;
-       wait_for_CLK_falling_edge();
+       wait_for_CLK_falling_edge(true); // don't stop on RDY, writes always succeed (CPU emulator will have at most 3 writes in a row, outside CPU emulator all write_byte calls are with sync=true)
 
-       wait_for_CLK_rising_edge();
+       // next call: when argument
+       // true then Te-te-te-techtech works correctly: https://csdb.dk/release/?id=118336, but Action Replay fails
+       // false then Action Replay works but demo is out of sync
+       wait_for_CLK_rising_edge(true); // don't stop on RDY, writes always succeed (CPU emulator will have at most 3 writes in a row, outside CPU emulator all write_byte calls are with sync=true)
 
   }
   // handle CPU port write
@@ -1003,7 +1016,7 @@ inline void Double_WriteBack(uint8_t local_data)  {
 // -------------------------------------------------
 void reset_sequence() {
     uint16_t temp1, temp2;
-       
+
     while (digitalReadFast(PIN_RESET)!=0) {}                        // Stay here until RESET deasserts
             
                 
