@@ -2178,16 +2178,17 @@ void handle_JAM() {
 void test_sequence() {
   const uint8_t test_program[] = { 0x78, 0xa9, 0x01, 0x8d, 0xf2, 0xd0, 0xa9, 0x03, 0x8d, 0xf1, 0xd0, 0xa9, 0x01, 0x8d, 0x30, 0xd0, 0xa2, 0x00, 0xa0, 0x01, 0x8e, 0x20, 0xd0, 0x8c, 0x20, 0xd0, 0x4c, 0x14, 0xc0 };
   const uint8_t test_program_size = sizeof(test_program)/sizeof(test_program[0]);
-  uint8_t tmp_mode;
-  tmp_mode = mode;
-  mode = 2;
+
+  // end the current cycle
+  finish_read_byte();
+
   for (uint8_t i=0;i<255;i++) {
-    write_byte(0x400+i,i);
+    write_byte(0x400+i,i,true);
   }
   for (uint8_t i=0;i<test_program_size;i++) {
-    write_byte(0xc000+i, test_program[i]);
+    write_byte(0xc000+i, test_program[i],true);
   }
-  mode = tmp_mode;
+  // return control
   start_read(register_pc);
 }
 
