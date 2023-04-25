@@ -2195,16 +2195,7 @@ void test_sequence() {
 // --------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------
 
-void monitor_reg() {
-  char buf[35];
-  Serial.println(" ADDR A  X  Y  SP 00 01 NV-BDIZC");
-  sprintf(buf,";%04X %02X %02X %02X %02X %02X %02X ",register_pc,register_a,register_x,register_y,register_sp,internal_RAM[0],internal_RAM[1]);
-  Serial.print(buf);
-  uint8_t f = register_flags;
-  for (uint8_t i=0;i<8;i++) {
-    if (f & 0x80) { Serial.print('1'); } else { Serial.print('0'); };
-    f = f << 1;
-  }
+void teensy_status() {
   Serial.println();
   Serial.print("Setup: mode="); Serial.print(mode);
   Serial.print(" LOAD:"); Serial.print(load_trap_enabled);
@@ -2217,6 +2208,19 @@ void monitor_reg() {
     Serial.print(reu_registers[i], HEX); Serial.print(" ");
   }
   Serial.println("]");
+}
+
+void monitor_reg() {
+  char buf[35];
+  Serial.println(" ADDR A  X  Y  SP 00 01 NV-BDIZC");
+  sprintf(buf,";%04X %02X %02X %02X %02X %02X %02X ",register_pc,register_a,register_x,register_y,register_sp,internal_RAM[0],internal_RAM[1]);
+  Serial.print(buf);
+  uint8_t f = register_flags;
+  for (uint8_t i=0;i<8;i++) {
+    Serial.print( (f & 0x80) ? '1' : '0' );
+    f = f << 1;
+  }
+  teensy_status();
 }
 
 uint16_t monitor_parse_hex() {
