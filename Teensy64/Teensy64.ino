@@ -566,6 +566,8 @@ FASTRUN inline void start_read(uint32_t local_address) {
       //last_access_internal_RAM=1;
   } else {
     last_access_internal_RAM=0;
+    // wait until write cycle is completed (will complete on rising edge)
+    while (write_mode) { };
 
     send_address(local_address);
   }
@@ -655,7 +657,8 @@ inline uint8_t read_byte(uint16_t local_address) {
   }
 
   last_access_internal_RAM=0;
-
+  // wait until write cycle is completed (will complete on rising edge)
+  // while (write_mode) { };
   send_address(local_address);
   wait_for_CLK_rising_edge();
 
@@ -733,12 +736,17 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
   }
   else 
   {
-       if (last_access_internal_RAM==1) {
-         last_access_internal_RAM=0;
-         if (clock_phase_high) { // wait for next rising edge for sync, but stop on RDY to sync
+      // wait until previous write cycle is completed (will happen on any rising edge)
+      if (write_mode) {
+        while (write_mode) { };
+      } else {
+       //if (last_access_internal_RAM==1) {
+         if (!clock_phase_high) { // wait for next rising edge for sync, but stop on RDY to sync
            wait_for_CLK_rising_edge();
          }
-       }
+       //}
+      }
+      last_access_internal_RAM=0;
 
        digitalWriteFast(PIN_RDWR_n,  0x0); // if this is removed the cursor doesn't blick anymore after reset
        send_address(local_address);
@@ -757,12 +765,12 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
        // During the second CLK phase, enable the data bus output drivers
        //
        write_mode = true;
-       wait_for_CLK_falling_edge(true); // don't stop on RDY, writes always succeed (CPU emulator will have at most 3 writes in a row, outside CPU emulator all write_byte calls are with sync=true)
+//       wait_for_CLK_falling_edge(true); // don't stop on RDY, writes always succeed (CPU emulator will have at most 3 writes in a row, outside CPU emulator all write_byte calls are with sync=true)
 
        // next call: when argument
        // true then Te-te-te-techtech works correctly: https://csdb.dk/release/?id=118336, but Action Replay fails
        // false then Action Replay works but demo is out of sync
-       wait_for_CLK_rising_edge(true); // don't stop on RDY, writes always succeed (CPU emulator will have at most 3 writes in a row, outside CPU emulator all write_byte calls are with sync=true)
+//       wait_for_CLK_rising_edge(true); // don't stop on RDY, writes always succeed (CPU emulator will have at most 3 writes in a row, outside CPU emulator all write_byte calls are with sync=true)
        // check out wait_for_CLK_rising_edge when ignoreRDY=true - there is extra wait state there (as if this one here was false)
        // u2+ menu fails any time
 
