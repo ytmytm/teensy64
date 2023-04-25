@@ -738,6 +738,10 @@ inline void write_byte(uint16_t local_address , uint8_t local_write_data, bool s
       // wait until previous write cycle is completed (will happen on any rising edge)
       if (write_mode) {
         while (write_mode) { };
+        // then keep waiting until RDY is cleared?
+        if (sync_needed) {
+          while (direct_ready_n==1) { }; // stop on RDY only in direct write mode - we might put too many bytes at once
+        }
       } else {
        //if (last_access_internal_RAM==1) {
          if (!clock_phase_high) { // wait for next rising edge for sync, but stop on RDY to sync
