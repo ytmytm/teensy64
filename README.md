@@ -218,10 +218,10 @@ Some commands are available in serial console over USB.
 |---|---|
 |0, 1, 2, 3 | unconditionally switch to specified mode |
 | R | trigger CPU reset |
-| e | set /EXROM to 0 and reset, this will activate 8k cartridge in $8000-$9fff |
-| E | set /EXROM to 1 and reset, this will deactivate 8k cartrdge |
+| e | set virtual /EXROM to 0 and reset, this will activate 8k cartridge in $8000-$9fff |
+| E | set virtual /EXROM to 1 and reset, this will deactivate 8k cartrdge |
 | t | test sequence, fill $0400-$04ff with values $00-$ff and put a short test program at $C000, start with SYS49152 |
-| ? | show status and configuratio info |
+| ? | show status and configuration info |
 
 There is a very simple machine code monitor available:
 
