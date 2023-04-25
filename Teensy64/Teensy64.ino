@@ -480,7 +480,6 @@ inline void wait_for_CLK_rising_edge(bool ignoreRDY=false) {
       // write byte wants to wait for rising edge (it's low (true: high) now) without RDY check
       register uint32_t clk2 = clk_count;
       while (clk2==clk_count) { };
-      while (clk==clk_rising) { }; // this uncommented is equivalent to wait_for_CLK_rising_edge(false) at the end of write_byte but less glitchy - ActionReplay works again but te-te-tech demo is broken (increasing speed also helps with glitching but not with scroll)
     } else {
       // usual, wait until bus is available
       while (clk==clk_rising) { };
