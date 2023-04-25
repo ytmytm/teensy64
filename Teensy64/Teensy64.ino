@@ -2267,19 +2267,6 @@ void monitor_reg() {
   emu_status();
 }
 
-void monitor_reg() {
-  char buf[35];
-  Serial.println(" ADDR A  X  Y  SP 00 01 NV-BDIZC");
-  sprintf(buf,";%04X %02X %02X %02X %02X %02X %02X ",register_pc,register_a,register_x,register_y,register_sp,internal_RAM[0],internal_RAM[1]);
-  Serial.print(buf);
-  uint8_t f = register_flags;
-  for (uint8_t i=0;i<8;i++) {
-    Serial.print( (f & 0x80) ? '1' : '0' );
-    f = f << 1;
-  }
-  teensy_status();
-}
-
 uint16_t monitor_parse_hex() {
   char b='\0';
   char buf[255];
