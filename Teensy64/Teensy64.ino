@@ -2308,9 +2308,7 @@ void monitor_go() {
             //case 'g': GAME=0; reset_sequence(); Serial.println("GAME=0"); break;
             //case 'G': GAME=1; reset_sequence(); Serial.println("GAME=1"); break;
             case 't': Serial.println("TEST"); test_sequence(); break;
-            case '?': Serial.print("M"); Serial.print(mode); Serial.print(" EXROM"); Serial.print(EXROM); Serial.print(" GAME"); Serial.println(GAME); 
-                Serial.print("Setup: mode="); Serial.print(mode); Serial.print(" LOAD:"); Serial.print(load_trap_enabled); Serial.print(" REU:"); Serial.println(reu_emulation_enabled);
-                break;
+            case '?': teensy_status(); break;
             case 'm': monitor_mem(); break;
             case 'r': monitor_reg(); break;
             case 'g': monitor_go(); break;
